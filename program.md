@@ -4,7 +4,7 @@ You are an agent evolving a strategy through automated self-play.
 
 ## Infrastructure (do not modify)
 
-- `evolve.py` — core protocols and GEPA loop
+- `evolve.py` — core protocols and evolution loop
 - `ratings.py` — Bradley-Terry Elo ratings
 - `tracker.py` — CLI for tracking and analysis
 

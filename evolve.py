@@ -1,7 +1,7 @@
 """
-autoevolve — GEPA loop for automated iterative improvement.
+autoevolve — evolution loop for automated iterative improvement.
 
-Generate -> Evaluate -> Promote -> Archive
+Mutate -> Evaluate -> Promote -> Archive
 
 A coding agent creates candidate variants of an artifact (a bot, prompt, strategy,
 or model config), evaluates them through head-to-head comparison, promotes the
@@ -96,7 +96,7 @@ def record(db: dict, result: MatchResult) -> dict:
     return db
 
 
-# ── GEPA loop ───────────────────────────────────────────────
+# ── Evolution loop ──────────────────────────────────────────
 
 
 def evolve(
@@ -111,7 +111,7 @@ def evolve(
     on_step: callable | None = None,
 ) -> dict:
     """
-    Run the Generate-Evaluate-Promote-Archive loop.
+    Run the Mutate-Evaluate-Promote-Archive loop.
 
     Each generation:
       1. Generate — mutator creates n_candidates variants from current best

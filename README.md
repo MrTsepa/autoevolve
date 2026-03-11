@@ -68,7 +68,7 @@ python tracker.py progress                                 # visualize progress
 ## The loop
 
 ```
-Generate   →  create a new version of the strategy
+Mutate     →  create a new version of the strategy
 Evaluate   →  benchmark against previous versions
 Promote    →  update ratings, crown the new best
 Archive    →  log everything for traceability
