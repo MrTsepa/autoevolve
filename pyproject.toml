@@ -7,3 +7,4 @@ dependencies = []
 
 [project.optional-dependencies]
 plot = ["matplotlib", "numpy"]
+animate = ["matplotlib", "numpy", "pillow"]

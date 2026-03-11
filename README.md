@@ -1,85 +1,84 @@
 # autoevolve
 
-Automated iterative improvement through self-play.
+Let a coding agent evolve your strategy overnight.
 
-A coding agent creates candidate variants of an artifact — a bot, a prompt, a strategy — evaluates them head-to-head, promotes the winners, and repeats. The human sets up the arena and the mutation rules. The agent runs the evolution.
+You define the arena and the rules. The agent runs the evolution — mutating strategies, benchmarking them head-to-head, and promoting the winners. This repo provides the loop and the tracking infrastructure.
 
-## The GEPA loop
+Inspired by [GEPA](https://github.com/gepa-ai/gepa) (Genetic-Pareto evolutionary optimization) and [autoresearch](https://github.com/karpathy/autoresearch) (autonomous AI research overnight). Where GEPA optimizes prompts and text parameters via LLM reflection, autoevolve focuses on self-play: evolving strategies, bots, or any artifact where quality is measured by head-to-head competition.
+
+## The idea
+
+Give an AI coding agent a strategy template and an evaluation harness. The agent runs the loop:
 
 ```
-┌─────────────────────────────────────────┐
-│                                         │
-│   Generate   →  create variant(s)       │
-│   Evaluate   →  head-to-head matchup    │
-│   Promote    →  update Elo ratings      │
-│   Archive    →  log everything          │
-│                                         │
-│   repeat until convergence              │
-│                                         │
-└─────────────────────────────────────────┘
+Generate   →  create a new version of the strategy
+Evaluate   →  benchmark against previous versions
+Promote    →  update ratings, crown the new best
+Archive    →  log everything for traceability
+
+repeat until convergence (or until you wake up)
 ```
 
-The framework tracks every match result in `matches.json`, computes [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) ratings (order-independent maximum-likelihood Elo), identifies the Pareto front, and visualizes progress.
+Every match result is recorded in `matches.json`. Ratings are computed from scratch each time using [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) maximum likelihood — order-independent and globally optimal. The Pareto front identifies which versions are worth branching from next.
+
+## Example: 80 versions evolved through self-play
+
+![Evolution Progress](example/progress.gif)
+
+Real data from a strategy evolution experiment. 80 versions, 235 matchups, tracked and rated automatically.
 
 ## What's here
 
 ```
+program.md     agent instructions — the main file you edit
 evolve.py      core loop + protocols (Artifact, Evaluator, Mutator)
 ratings.py     Bradley-Terry Elo, per-version stats, Pareto front
-tracker.py     CLI: leaderboard, record, plot, validate, suggest
-example/       real evolution data — 80 versions, 158 matchups
+tracker.py     CLI: leaderboard, record, plot, validate, suggest, animate
+example/       real evolution data with animated visualization
 ```
+
+The agent only touches the strategy files. Everything else is infrastructure.
 
 ## Quick start
 
-```bash
-# Record match results
-python tracker.py record v2 v1 --wins 62 --losses 38
-python tracker.py record v3 v2 --wins 88 --losses 12
-
-# View leaderboard
-python tracker.py leaderboard
-
-# Generate progress visualization
-python tracker.py plot  # requires matplotlib
-
-# Validate rating reliability
-python tracker.py validate
-
-# Get next opponent suggestion (information-theoretic)
-python tracker.py suggest v3
-```
-
-## Example: real evolution data
-
-The `example/` directory contains real match data from an 80-version strategy evolution. Run the tracker against it:
+1. Clone the repo
+2. Edit `program.md`: define your environment, strategy format, and evaluation command
+3. Point your coding agent at the repo
+4. Let it evolve
 
 ```bash
-python tracker.py --db example/matches.json leaderboard
-python tracker.py --db example/matches.json plot
-python tracker.py --db example/matches.json validate
+# The agent runs these as part of the loop:
+python tracker.py leaderboard                              # check standings
+python tracker.py record v2 v1 --wins 62 --losses 38      # log result
+python tracker.py suggest v2                               # pick next opponent
+python tracker.py plot                                     # visualize progress
 ```
 
-## How it works
+## Tracker commands
 
-**Rating system.** Bradley-Terry maximum-likelihood estimation, converted to the Elo scale. Unlike sequential Elo (which depends on match order), BT finds the globally optimal ratings that best explain all results simultaneously. 400 points = 10:1 odds.
+| Command | What it does |
+|---------|-------------|
+| `record` | Log a match result |
+| `leaderboard` | Show Elo rankings with Pareto front |
+| `pareto` | Show non-dominated versions |
+| `matrix` | Head-to-head win rate table |
+| `plot` | Generate progress.png (4-panel) |
+| `validate` | Prediction accuracy + bootstrap CIs |
+| `suggest` | Next opponent (information-theoretic) |
+| `animate` | Generate progress.gif from match history |
 
-**Smart matchmaking.** The `suggest` command uses information-theoretic scoring: `score = p*(1-p) / sqrt(games+1)` — prioritizing matchups that are both close (high uncertainty about outcome) and undersampled (few existing games).
+All commands accept `--db path/to/matches.json`.
 
-**Pareto front.** Versions are compared across multiple dimensions (Elo, score margin, win rate). The Pareto front identifies non-dominated versions — candidates worth branching from for the next mutation.
+## How the ratings work
 
-## Using with a coding agent
+**Bradley-Terry MLE** finds the globally optimal ratings that best explain all match results simultaneously. Unlike sequential Elo, it doesn't depend on match order. 400 points = 10:1 win odds.
 
-The intended workflow:
+**Information-theoretic matchmaking**: `score = p*(1-p) / sqrt(games+1)` — prioritizes matchups that are both close (uncertain outcome) and undersampled.
 
-1. Define your artifact (bot, prompt, strategy) as versioned files
-2. Write an evaluator (benchmark script, self-play harness, LLM judge)
-3. Give the agent `evolve.py` protocols + your evaluator
-4. The agent mutates, evaluates, records, checks leaderboard, repeats
-
-See `evolve.py` for the `Artifact`, `Evaluator`, and `Mutator` protocols, and the `evolve()` loop.
+**Pareto front**: versions compared across Elo, score margin, and win rate. Non-dominated versions are the best candidates to branch from.
 
 ## Prior art
 
+- [GEPA](https://github.com/gepa-ai/gepa) — Genetic-Pareto evolutionary optimization of text parameters via LLM reflection
 - [autoresearch](https://github.com/karpathy/autoresearch) — autonomous AI research via overnight LLM training experiments
-- Bradley-Terry model — [Wikipedia](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model)
+- [Bradley-Terry model](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) — pairwise comparison probability model

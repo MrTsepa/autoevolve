@@ -346,6 +346,118 @@ def cmd_suggest(args):
         print(f"  {v:<12} Elo {ratings[v]:>6.0f}  ({games} h2h games, info {info:.4f})")
 
 
+def cmd_animate(args):
+    """Generate progress.gif showing rating evolution over time."""
+    import io
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from PIL import Image
+
+    db = load_db(args.db)
+    matches = db["matches"]
+    if not matches:
+        print("No matches to animate.")
+        return
+
+    gif_path = Path(args.db).parent / "progress.gif"
+    step = args.step
+    n = len(matches)
+
+    # Precompute ratings at each match
+    print(f"Computing ratings for {n} matches...")
+    snapshots = []
+    for k in range(1, n + 1):
+        partial = {"matches": matches[:k], "versions": db["versions"]}
+        r, _ = compute_ratings(partial)
+        s = compute_stats(partial)
+        snapshots.append((r, s))
+
+    # Global Elo bounds for stable axes
+    all_elos = [elo for r, _ in snapshots for elo in r.values()]
+    elo_lo = min(all_elos) - 30
+    elo_hi = max(all_elos) + 30
+
+    # Build full history
+    history = defaultdict(list)
+    for k, (ratings, _) in enumerate(snapshots):
+        for v, elo in ratings.items():
+            history[v].append((k, elo))
+
+    # Render frames
+    print("Rendering frames...")
+    frames = []
+    frame_indices = list(range(0, n, step))
+    if frame_indices[-1] != n - 1:
+        frame_indices.append(n - 1)
+
+    for fi, k in enumerate(frame_indices):
+        ratings, stats = snapshots[k]
+        sorted_v = sorted(ratings, key=ratings.get, reverse=True)[:15]
+        front = pareto_front(sorted_v, _dims(ratings, stats))
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        fig.suptitle(
+            f"Evolution Progress \u2014 Match {k+1}/{n}",
+            fontsize=13,
+            fontweight="bold",
+        )
+
+        # Left: Elo bar chart
+        colors = ["#2ecc71" if v in front else "#3498db" for v in sorted_v]
+        elos = [ratings[v] for v in sorted_v]
+        ax1.barh(range(len(sorted_v)), elos, color=colors)
+        ax1.set_yticks(range(len(sorted_v)))
+        ax1.set_yticklabels(sorted_v, fontsize=9)
+        ax1.set_xlabel("Elo Rating")
+        ax1.set_title("Current Ratings (green = Pareto)")
+        ax1.invert_yaxis()
+        ax1.set_xlim(elo_lo, elo_hi)
+        for i, v in enumerate(sorted_v):
+            ax1.text(ratings[v] + 2, i, f"{ratings[v]:.0f}", va="center", fontsize=8)
+
+        # Right: Elo progression
+        for v in sorted_v:
+            if v in history:
+                pts = [(x, y) for x, y in history[v] if x <= k]
+                if pts:
+                    xs, ys = zip(*pts)
+                    style = "-" if v in front else "--"
+                    lw = 1.5 if v in front else 0.8
+                    ax2.plot(xs, ys, style, label=v, linewidth=lw, alpha=0.9)
+        ax2.set_xlabel("Match #")
+        ax2.set_ylabel("Elo")
+        ax2.set_title("Rating Progression")
+        ax2.set_xlim(0, n)
+        ax2.set_ylim(elo_lo, elo_hi)
+        ax2.legend(fontsize=6, loc="upper left", ncol=2)
+
+        plt.tight_layout()
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", dpi=80)
+        buf.seek(0)
+        frames.append(Image.open(buf).copy())
+        plt.close(fig)
+        buf.close()
+
+        if (fi + 1) % 20 == 0 or fi == len(frame_indices) - 1:
+            print(f"  Frame {fi+1}/{len(frame_indices)}")
+
+    # Save GIF — hold last frame longer
+    durations = [150] * len(frames)
+    durations[-1] = 2000
+    frames[0].save(
+        gif_path,
+        save_all=True,
+        append_images=frames[1:],
+        duration=durations,
+        loop=0,
+    )
+    print(f"Saved: {gif_path} ({len(frames)} frames)")
+
+
 # ── CLI ─────────────────────────────────────────────────────
 
 
@@ -372,6 +484,9 @@ def main():
     p = sub.add_parser("suggest", help="Suggest next opponent")
     p.add_argument("version")
 
+    p = sub.add_parser("animate", help="Generate progress.gif")
+    p.add_argument("--step", type=int, default=1, help="Matches per frame (default: every match)")
+
     commands = {
         "record": cmd_record,
         "leaderboard": cmd_leaderboard,
@@ -380,6 +495,7 @@ def main():
         "plot": cmd_plot,
         "validate": cmd_validate,
         "suggest": cmd_suggest,
+        "animate": cmd_animate,
     }
 
     args = parser.parse_args()
