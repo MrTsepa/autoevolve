@@ -19,6 +19,7 @@ Inspired by [GEPA](https://github.com/gepa-ai/gepa) and [autoresearch](https://g
 ### Where this applies
 
 - **Game bots** — evolve strategies for board games, card games, or real-time competitions through self-play
+- **RL policies as code** — instead of learning opaque neural network weights, evolve readable heuristic policies (decision trees, rule sets, state machines) that an agent can inspect, debug, and improve
 - **Prompt engineering** — two prompt versions produce outputs, an LLM judge picks the winner
 - **Trading strategies** — backtest candidates on the same historical data, compare risk-adjusted returns
 - **Red team / blue team** — co-evolve attacks and defenses, both sides get stronger
