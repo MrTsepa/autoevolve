@@ -2,7 +2,9 @@
 
 Let a coding agent evolve your strategy overnight.
 
-Three ideas that work well together:
+You have a bot, a prompt, or a strategy. You can pit two versions against each other and see which one wins. But manually tweaking, benchmarking, and tracking dozens of versions is tedious. What if an AI agent did that loop for you — creating variants, running matches, keeping the winners, and repeating while you sleep?
+
+That's autoevolve. Three ideas that work well together:
 
 1. **Agentic coding** — LLM agents are surprisingly good at iterating on hypotheses in environments with measurable feedback ([autoresearch](https://github.com/karpathy/autoresearch)). They can read code, propose changes, and run experiments autonomously.
 2. **Self-play evaluation** — not every improvement can be measured by a unit test or a loss function. Some things — game strategies, negotiation tactics, adversarial robustness — can only be measured by playing against other versions.
