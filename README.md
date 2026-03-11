@@ -8,13 +8,31 @@ That's autoevolve. Three ideas that work well together:
 
 1. **Agentic coding** — LLM agents are surprisingly good at iterating on hypotheses in environments with measurable feedback ([autoresearch](https://github.com/karpathy/autoresearch)). They can read code, propose changes, and run experiments autonomously.
 2. **Self-play evaluation** — not every improvement can be measured by a unit test or a loss function. Some things — game strategies, negotiation tactics, adversarial robustness — can only be measured by playing against other versions.
-3. **Genetic-Pareto search** — [GEPA](https://github.com/gepa-ai/gepa) showed that evolutionary search with LLM reflection can be 35x faster than RL (100-500 evaluations vs 5,000-25,000+) while achieving strong results (32% → 89% on ARC-AGI). Instead of collapsing everything to a scalar reward, keep a Pareto front of non-dominated solutions and branch from the best.
+3. **Genetic-Pareto search** — [GEPA](https://github.com/gepa-ai/gepa) showed that evolutionary search with LLM reflection can be surprisingly sample-efficient on certain benchmarks (100-500 evaluations vs 5,000-25,000+ for RL on ARC-AGI). Instead of collapsing everything to a scalar reward, keep a Pareto front of non-dominated solutions and branch from the best.
 
-This is essentially what RL does — iterative improvement via environment feedback — but with a coding agent instead of gradient descent. The tradeoffs are compelling: RL needs thousands of episodes, differentiable rewards, and produces opaque weight updates. An LLM agent reads the code, analyzes *why* a version lost, and proposes a targeted fix. Its world knowledge acts as a massive prior. The result is human-readable strategies that improve in 100s of iterations, not 10,000s.
+The motivation is similar to RL — iterative improvement via environment feedback — but with a coding agent instead of gradient descent. Where RL needs many episodes, differentiable rewards, and produces opaque weight updates, an LLM agent can read the code, analyze *why* a version lost, and propose a targeted fix. Its world knowledge acts as a strong prior. The upside is human-readable strategies and fast iteration; the downside is cost-per-step and the usual LLM reliability caveats. How far this scales is an open question — this repo is a tool for exploring it.
 
 You define the arena and the rules. The agent runs the evolution — mutating strategies, benchmarking them head-to-head, and promoting the winners. This repo provides the loop and the tracking infrastructure.
 
 Inspired by [GEPA](https://github.com/gepa-ai/gepa) and [autoresearch](https://github.com/karpathy/autoresearch).
+
+### Architecture
+
+```
+┌─────────────┐ pick parent  ┌─────────────┐  new version  ┌──────────┐
+│   Selector  │─────────────►│   Mutator   │──────────────►│ Artifact │
+│ (Pareto front              │ (LLM agent  │               │ (v1, v2, │
+│  + suggest) │              │  edits code)│               │  ... vN) │
+└──────▲──────┘              └─────────────┘               └────┬─────┘
+       │                                                        │
+       │ leaderboard                               head-to-head │
+       │                                                        ▼
+┌─────────────┐    record    ┌─────────────┐    results   ┌───────────┐
+│   Tracker   │◄─────────────│   Ratings   │◄─────────────│ Evaluator │
+│ matches.json│              │(Bradley-Terry│              │(benchmark)│
+│   + CLI     │              │  Elo + stats)│              └───────────┘
+└─────────────┘              └─────────────┘
+```
 
 ### Where this applies
 
