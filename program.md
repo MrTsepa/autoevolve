@@ -12,12 +12,12 @@ You are an agent evolving a strategy through automated self-play.
 
 Each iteration:
 
-1. **Check standings**: `python tracker.py leaderboard`
+1. **Check standings**: `uv run python tracker.py leaderboard`
 2. **Pick a parent**: choose a version from the Pareto front to branch from
 3. **Analyze**: look at win/loss patterns, replay traces, failure modes
 4. **Mutate**: create a new version with targeted improvements
 5. **Evaluate**: benchmark the new version against top opponents
-6. **Record**: `python tracker.py record vNew vOld --wins W --losses L`
+6. **Record**: `uv run python tracker.py record vNew vOld --wins W --losses L`
 7. **Reflect**: did it improve? what to try next?
 8. **Repeat**
 
@@ -26,7 +26,7 @@ Each iteration:
 - One version per iteration. Name sequentially: v1, v2, v3, ...
 - Minimum 100 games per matchup for statistical significance
 - Match data is append-only — never delete results
-- Use `python tracker.py suggest vN` to pick the most informative opponent
+- Use `uv run python tracker.py suggest vN` to pick the most informative opponent
 - Branch from Pareto-front versions, not just the highest-rated
 - When stuck, analyze replays or traces to diagnose specific failure modes
 - Commit matches.json after each significant benchmark round
@@ -51,4 +51,4 @@ _What does a "version" look like?_
 
 _How do you run a head-to-head benchmark?_
 
-(e.g., `python benchmark.py --player-a vN --player-b vM -n 100`)
+(e.g., `uv run python benchmark.py --player-a vN --player-b vM -n 100`)
