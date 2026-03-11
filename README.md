@@ -40,6 +40,7 @@ Real data from a strategy evolution experiment. 76 versions, 235 matchups, track
 ```bash
 git clone https://github.com/MrTsepa/autoevolve.git
 cd autoevolve
+uv sync                        # install dependencies
 ```
 
 Then open a coding agent (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) in this directory and say:
@@ -59,10 +60,10 @@ If you prefer to set things up yourself:
 3. The agent (or you) runs the loop:
 
 ```bash
-python tracker.py record v2 v1 --wins 62 --losses 38      # log result
-python tracker.py leaderboard                              # check standings
-python tracker.py suggest v2                               # pick next opponent
-python tracker.py progress                                 # visualize progress
+uv run python tracker.py record v2 v1 --wins 62 --losses 38   # log result
+uv run python tracker.py leaderboard                           # check standings
+uv run python tracker.py suggest v2                            # pick next opponent
+uv run python tracker.py progress                              # visualize progress
 ```
 
 ## The loop
