@@ -6,3 +6,4 @@ dist/
 progress.png
 matches.json
 !example/matches.json
+!example/progress.png

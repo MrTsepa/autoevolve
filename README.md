@@ -21,11 +21,13 @@ repeat until convergence (or until you wake up)
 
 Every match result is recorded in `matches.json`. Ratings are computed from scratch each time using [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) maximum likelihood — order-independent and globally optimal. The Pareto front identifies which versions are worth branching from next.
 
-## Example: 80 versions evolved through self-play
+## Example: 76 versions evolved through self-play
 
-![Evolution Progress](example/progress.gif)
+![Evolution Progress](example/progress.png)
 
-Real data from a strategy evolution experiment. 80 versions, 235 matchups, tracked and rated automatically.
+![Evolution Animation](example/progress.gif)
+
+Real data from a strategy evolution experiment. 76 versions, 235 matchups, tracked and rated automatically. Green dots are kept improvements; gray dots are discarded. The staircase line tracks the running best.
 
 ## What's here
 
@@ -62,7 +64,8 @@ python tracker.py plot                                     # visualize progress
 | `leaderboard` | Show Elo rankings with Pareto front |
 | `pareto` | Show non-dominated versions |
 | `matrix` | Head-to-head win rate table |
-| `plot` | Generate progress.png (4-panel) |
+| `plot` | Generate 4-panel overview (bars, progression, heatmap, Pareto) |
+| `progress` | Generate progress.png (Elo over version #, autoresearch-style) |
 | `validate` | Prediction accuracy + bootstrap CIs |
 | `suggest` | Next opponent (information-theoretic) |
 | `animate` | Generate progress.gif from match history |

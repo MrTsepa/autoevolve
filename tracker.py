@@ -346,6 +346,98 @@ def cmd_suggest(args):
         print(f"  {v:<12} Elo {ratings[v]:>6.0f}  ({games} h2h games, info {info:.4f})")
 
 
+def cmd_progress(args):
+    """Generate progress.png — autoresearch-style scatter of Elo over version number."""
+    import re
+
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    db = load_db(args.db)
+    ratings, _ = compute_ratings(db)
+    stats = compute_stats(db)
+    if not ratings:
+        print("No matches recorded yet.")
+        return
+
+    plot_path = Path(args.db).parent / "progress.png"
+
+    # Sort versions by natural order (v1, v2, ... v10, v11, ...)
+    def sort_key(v):
+        m = re.match(r"v(\d+)", v)
+        return (int(m.group(1)), v) if m else (float("inf"), v)
+
+    all_v = sorted(ratings.keys(), key=sort_key)
+
+    # Determine which versions are "kept" (were ever the best at time of creation)
+    # Approximate: a version is "kept" if it's on the Pareto front or was ever #1
+    dims = _dims(ratings, stats)
+    front = pareto_front(all_v, dims)
+
+    # Build running best
+    running_best_elo = float("-inf")
+    running_best_xs, running_best_ys = [], []
+    xs, ys, kept = [], [], []
+    for i, v in enumerate(all_v):
+        elo = ratings[v]
+        xs.append(i)
+        ys.append(elo)
+        is_kept = elo > running_best_elo
+        kept.append(is_kept)
+        if is_kept:
+            running_best_elo = elo
+            running_best_xs.append(i)
+            running_best_ys.append(elo)
+
+    # Extend running best line to the end
+    if running_best_xs:
+        running_best_xs.append(xs[-1])
+        running_best_ys.append(running_best_ys[-1])
+
+    n_kept = sum(kept)
+    n_total = len(all_v)
+
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig.suptitle(
+        f"Evolution Progress: {n_total} Versions, {n_kept} Kept Improvements",
+        fontsize=13,
+        fontweight="bold",
+    )
+
+    # Discarded (gray)
+    disc_xs = [x for x, k in zip(xs, kept) if not k]
+    disc_ys = [y for y, k in zip(ys, kept) if not k]
+    ax.scatter(disc_xs, disc_ys, c="#cccccc", s=40, zorder=2, label="Discarded")
+
+    # Kept (green)
+    kept_xs = [x for x, k in zip(xs, kept) if k]
+    kept_ys = [y for y, k in zip(ys, kept) if k]
+    ax.scatter(kept_xs, kept_ys, c="#2ecc71", s=60, zorder=3, label="Kept", edgecolors="white", linewidth=0.5)
+
+    # Running best staircase
+    ax.step(running_best_xs, running_best_ys, where="post", c="#2ecc71", linewidth=1.5, zorder=2, label="Running best")
+
+    # Annotate kept versions
+    for x, y, v, k in zip(xs, ys, all_v, kept):
+        if k:
+            ax.annotate(
+                v, (x, y), fontsize=7, color="#333333",
+                textcoords="offset points", xytext=(5, 5), rotation=30,
+            )
+
+    ax.set_xlabel("Version #")
+    ax.set_ylabel("Elo Rating (higher is better)")
+    ax.set_xticks(range(0, len(all_v), max(1, len(all_v) // 15)))
+    ax.legend(loc="lower right", fontsize=9)
+    ax.grid(axis="y", alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig(plot_path, dpi=150)
+    print(f"Saved: {plot_path}")
+
+
 def cmd_animate(args):
     """Generate progress.gif with 4-panel view: bars, progression, heatmap, Pareto scatter."""
     import io
@@ -566,7 +658,8 @@ def main():
     sub.add_parser("leaderboard", help="Show Elo leaderboard")
     sub.add_parser("pareto", help="Show Pareto front")
     sub.add_parser("matrix", help="Show head-to-head matrix")
-    sub.add_parser("plot", help="Generate progress.png (requires matplotlib)")
+    sub.add_parser("plot", help="Generate progress.png (4-panel)")
+    sub.add_parser("progress", help="Generate progress.png (Elo over version #)")
     sub.add_parser("validate", help="Assess rating reliability")
 
     p = sub.add_parser("suggest", help="Suggest next opponent")
@@ -582,6 +675,7 @@ def main():
         "pareto": cmd_pareto,
         "matrix": cmd_matrix,
         "plot": cmd_plot,
+        "progress": cmd_progress,
         "validate": cmd_validate,
         "suggest": cmd_suggest,
         "animate": cmd_animate,
