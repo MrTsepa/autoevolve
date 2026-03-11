@@ -8,7 +8,7 @@ Three ideas that work well together:
 2. **Self-play evaluation** — not every improvement can be measured by a unit test or a loss function. Some things — game strategies, negotiation tactics, adversarial robustness — can only be measured by playing against other versions.
 3. **Genetic-Pareto search** — [GEPA](https://github.com/gepa-ai/gepa) showed that evolutionary search with LLM reflection can be 35x faster than RL (100-500 evaluations vs 5,000-25,000+) while achieving strong results (32% → 89% on ARC-AGI). Instead of collapsing everything to a scalar reward, keep a Pareto front of non-dominated solutions and branch from the best.
 
-autoevolve connects these: a coding agent mutates strategies, a self-play harness evaluates them with Elo ratings, and Pareto selection decides what to keep.
+You define the arena and the rules. The agent runs the evolution — mutating strategies, benchmarking them head-to-head, and promoting the winners. This repo provides the loop and the tracking infrastructure.
 
 Inspired by [GEPA](https://github.com/gepa-ai/gepa) and [autoresearch](https://github.com/karpathy/autoresearch).
 
