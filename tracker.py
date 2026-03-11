@@ -347,13 +347,14 @@ def cmd_suggest(args):
 
 
 def cmd_animate(args):
-    """Generate progress.gif showing rating evolution over time."""
+    """Generate progress.gif with 4-panel view: bars, progression, heatmap, Pareto scatter."""
     import io
 
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    import numpy as np
     from PIL import Image
 
     db = load_db(args.db)
@@ -375,11 +376,6 @@ def cmd_animate(args):
         s = compute_stats(partial)
         snapshots.append((r, s))
 
-    # Global Elo bounds for stable axes
-    all_elos = [elo for r, _ in snapshots for elo in r.values()]
-    elo_lo = min(all_elos) - 30
-    elo_hi = max(all_elos) + 30
-
     # Build full history
     history = defaultdict(list)
     for k, (ratings, _) in enumerate(snapshots):
@@ -398,27 +394,53 @@ def cmd_animate(args):
         sorted_v = sorted(ratings, key=ratings.get, reverse=True)[:15]
         front = pareto_front(sorted_v, _dims(ratings, stats))
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        # Per-frame bounds from current top 15
+        elos = [ratings[v] for v in sorted_v]
+        elo_lo = min(elos) - 50
+        elo_hi = max(elos) + 40
+
+        # Collect visible history points for progression bounds
+        all_hist_pts = []
+        min_match = k
+        for v in sorted_v:
+            if v in history:
+                pts = [(x, y) for x, y in history[v] if x <= k]
+                if pts:
+                    all_hist_pts.extend(pts)
+                    min_match = min(min_match, pts[0][0])
+        if all_hist_pts:
+            hist_ys = [y for _, y in all_hist_pts]
+            prog_elo_lo = min(hist_ys) - 30
+            prog_elo_hi = max(hist_ys) + 30
+        else:
+            prog_elo_lo, prog_elo_hi = elo_lo, elo_hi
+
+        margins = [stats.get(v, {}).get("margin", 0) for v in sorted_v]
+        margin_lo = min(margins) - 10
+        margin_hi = max(margins) + 10
+
+        fig, axes = plt.subplots(2, 2, figsize=(16, 11))
         fig.suptitle(
             f"Evolution Progress \u2014 Match {k+1}/{n}",
-            fontsize=13,
+            fontsize=14,
             fontweight="bold",
         )
 
-        # Left: Elo bar chart
+        # 1. Elo bar chart
+        ax = axes[0, 0]
         colors = ["#2ecc71" if v in front else "#3498db" for v in sorted_v]
-        elos = [ratings[v] for v in sorted_v]
-        ax1.barh(range(len(sorted_v)), elos, color=colors)
-        ax1.set_yticks(range(len(sorted_v)))
-        ax1.set_yticklabels(sorted_v, fontsize=9)
-        ax1.set_xlabel("Elo Rating")
-        ax1.set_title("Current Ratings (green = Pareto)")
-        ax1.invert_yaxis()
-        ax1.set_xlim(elo_lo, elo_hi)
+        ax.barh(range(len(sorted_v)), elos, color=colors)
+        ax.set_yticks(range(len(sorted_v)))
+        ax.set_yticklabels(sorted_v, fontsize=9)
+        ax.set_xlabel("Elo Rating")
+        ax.set_title("Top 15 (green = Pareto)")
+        ax.invert_yaxis()
+        ax.set_xlim(elo_lo, elo_hi)
         for i, v in enumerate(sorted_v):
-            ax1.text(ratings[v] + 2, i, f"{ratings[v]:.0f}", va="center", fontsize=8)
+            ax.text(ratings[v] + 2, i, f"{ratings[v]:.0f}", va="center", fontsize=8)
 
-        # Right: Elo progression
+        # 2. Elo progression
+        ax = axes[0, 1]
         for v in sorted_v:
             if v in history:
                 pts = [(x, y) for x, y in history[v] if x <= k]
@@ -426,17 +448,73 @@ def cmd_animate(args):
                     xs, ys = zip(*pts)
                     style = "-" if v in front else "--"
                     lw = 1.5 if v in front else 0.8
-                    ax2.plot(xs, ys, style, label=v, linewidth=lw, alpha=0.9)
-        ax2.set_xlabel("Match #")
-        ax2.set_ylabel("Elo")
-        ax2.set_title("Rating Progression")
-        ax2.set_xlim(0, n)
-        ax2.set_ylim(elo_lo, elo_hi)
-        ax2.legend(fontsize=6, loc="upper left", ncol=2)
+                    ax.plot(xs, ys, style, label=v, linewidth=lw, alpha=0.9)
+        ax.set_xlabel("Match #")
+        ax.set_ylabel("Elo")
+        ax.set_title("Rating Progression (Bradley-Terry)")
+        ax.set_xlim(max(0, min_match - 2), k + 3)
+        ax.set_ylim(prog_elo_lo, prog_elo_hi)
+        ax.legend(fontsize=6, loc="upper left", ncol=2)
+
+        # 3. Head-to-head heatmap
+        ax = axes[1, 0]
+        h2h = defaultdict(lambda: defaultdict(lambda: [0, 0]))
+        for m in matches[: k + 1]:
+            a, b = m["a"], m["b"]
+            h2h[a][b][0] += m["wins_a"]
+            h2h[a][b][1] += m["wins_b"]
+            h2h[b][a][0] += m["wins_b"]
+            h2h[b][a][1] += m["wins_a"]
+        nv = len(sorted_v)
+        matrix = np.full((nv, nv), np.nan)
+        for i, a in enumerate(sorted_v):
+            for j, b in enumerate(sorted_v):
+                if i != j and h2h[a][b][0] + h2h[a][b][1] > 0:
+                    w, l = h2h[a][b]
+                    matrix[i, j] = w / (w + l) * 100
+        im = ax.imshow(matrix, cmap="RdYlGn", vmin=20, vmax=80, aspect="auto")
+        ax.set_xticks(range(nv))
+        ax.set_yticks(range(nv))
+        ax.set_xticklabels(sorted_v, fontsize=7, rotation=45, ha="right")
+        ax.set_yticklabels(sorted_v, fontsize=7)
+        ax.set_title("Head-to-Head Win Rate %")
+        for i in range(nv):
+            for j in range(nv):
+                if not np.isnan(matrix[i, j]):
+                    color = "white" if matrix[i, j] < 35 or matrix[i, j] > 65 else "black"
+                    ax.text(
+                        j, i, f"{matrix[i, j]:.0f}",
+                        ha="center", va="center", fontsize=7, color=color,
+                    )
+        fig.colorbar(im, ax=ax, shrink=0.8)
+
+        # 4. Pareto scatter
+        ax = axes[1, 1]
+        for v in sorted_v:
+            s = stats.get(v, {"win_rate": 50, "margin": 0, "games": 0})
+            color = "#2ecc71" if v in front else "#95a5a6"
+            size = max(20, min(400, s["games"]))
+            ax.scatter(
+                s["margin"], ratings[v], c=color, s=size,
+                edgecolors="black", linewidth=0.5, zorder=3,
+            )
+            ax.annotate(
+                v, (s["margin"], ratings[v]),
+                fontsize=7, textcoords="offset points", xytext=(5, 5),
+            )
+        ax.set_xlabel("Score Margin")
+        ax.set_ylabel("Elo Rating")
+        ax.set_title("Pareto: Elo vs Margin (size = games played)")
+        ax.set_xlim(margin_lo, margin_hi)
+        ax.set_ylim(elo_lo, elo_hi)
+        if 1500 >= elo_lo and 1500 <= elo_hi:
+            ax.axhline(y=1500, color="gray", linestyle=":", alpha=0.5)
+        if 0 >= margin_lo and 0 <= margin_hi:
+            ax.axvline(x=0, color="gray", linestyle=":", alpha=0.5)
 
         plt.tight_layout()
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=80)
+        plt.savefig(buf, format="png", dpi=72)
         buf.seek(0)
         frames.append(Image.open(buf).copy())
         plt.close(fig)
