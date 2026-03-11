@@ -60,10 +60,10 @@ If you prefer to set things up yourself:
 3. The agent (or you) runs the loop:
 
 ```bash
-uv run python tracker.py record v2 v1 --wins 62 --losses 38   # log result
-uv run python tracker.py leaderboard                           # check standings
-uv run python tracker.py suggest v2                            # pick next opponent
-uv run python tracker.py progress                              # visualize progress
+uv run tracker.py record v2 v1 --wins 62 --losses 38   # log result
+uv run tracker.py leaderboard                           # check standings
+uv run tracker.py suggest v2                            # pick next opponent
+uv run tracker.py progress                              # visualize progress
 ```
 
 ## The loop
