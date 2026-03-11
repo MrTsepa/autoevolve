@@ -382,6 +382,14 @@ def cmd_animate(args):
         for v, elo in ratings.items():
             history[v].append((k, elo))
 
+    # Assign stable colors per version (collect all that ever appear in top 15)
+    top_ever = set()
+    for r, _ in snapshots:
+        top_ever.update(sorted(r, key=r.get, reverse=True)[:15])
+    top_ever = sorted(top_ever)
+    cmap = plt.get_cmap("tab20", max(len(top_ever), 1))
+    version_colors = {v: cmap(i) for i, v in enumerate(top_ever)}
+
     # Render frames
     print("Rendering frames...")
     frames = []
@@ -439,7 +447,7 @@ def cmd_animate(args):
         for i, v in enumerate(sorted_v):
             ax.text(ratings[v] + 2, i, f"{ratings[v]:.0f}", va="center", fontsize=8)
 
-        # 2. Elo progression
+        # 2. Elo progression (stable colors per version)
         ax = axes[0, 1]
         for v in sorted_v:
             if v in history:
@@ -448,7 +456,8 @@ def cmd_animate(args):
                     xs, ys = zip(*pts)
                     style = "-" if v in front else "--"
                     lw = 1.5 if v in front else 0.8
-                    ax.plot(xs, ys, style, label=v, linewidth=lw, alpha=0.9)
+                    ax.plot(xs, ys, style, label=v, linewidth=lw, alpha=0.9,
+                            color=version_colors.get(v))
         ax.set_xlabel("Match #")
         ax.set_ylabel("Elo")
         ax.set_title("Rating Progression (Bradley-Terry)")
@@ -514,14 +523,15 @@ def cmd_animate(args):
 
         plt.tight_layout()
         buf = io.BytesIO()
-        plt.savefig(buf, format="png", dpi=72)
+        plt.savefig(buf, format="png", dpi=args.dpi)
         buf.seek(0)
         frames.append(Image.open(buf).copy())
         plt.close(fig)
         buf.close()
 
-        if (fi + 1) % 20 == 0 or fi == len(frame_indices) - 1:
-            print(f"  Frame {fi+1}/{len(frame_indices)}")
+        pct = (fi + 1) / len(frame_indices) * 100
+        print(f"\r  Frame {fi+1}/{len(frame_indices)} ({pct:.0f}%)", end="", flush=True)
+    print()
 
     # Save GIF — hold last frame longer
     durations = [150] * len(frames)
@@ -564,6 +574,7 @@ def main():
 
     p = sub.add_parser("animate", help="Generate progress.gif")
     p.add_argument("--step", type=int, default=1, help="Matches per frame (default: every match)")
+    p.add_argument("--dpi", type=int, default=72, help="Resolution (default: 72)")
 
     commands = {
         "record": cmd_record,
