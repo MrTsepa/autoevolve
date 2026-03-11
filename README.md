@@ -10,9 +10,21 @@ That's autoevolve. Three ideas that work well together:
 2. **Self-play evaluation** — not every improvement can be measured by a unit test or a loss function. Some things — game strategies, negotiation tactics, adversarial robustness — can only be measured by playing against other versions.
 3. **Genetic-Pareto search** — [GEPA](https://github.com/gepa-ai/gepa) showed that evolutionary search with LLM reflection can be 35x faster than RL (100-500 evaluations vs 5,000-25,000+) while achieving strong results (32% → 89% on ARC-AGI). Instead of collapsing everything to a scalar reward, keep a Pareto front of non-dominated solutions and branch from the best.
 
+This is essentially what RL does — iterative improvement via environment feedback — but with a coding agent instead of gradient descent. The tradeoffs are compelling: RL needs thousands of episodes, differentiable rewards, and produces opaque weight updates. An LLM agent reads the code, analyzes *why* a version lost, and proposes a targeted fix. Its world knowledge acts as a massive prior. The result is human-readable strategies that improve in 100s of iterations, not 10,000s.
+
 You define the arena and the rules. The agent runs the evolution — mutating strategies, benchmarking them head-to-head, and promoting the winners. This repo provides the loop and the tracking infrastructure.
 
 Inspired by [GEPA](https://github.com/gepa-ai/gepa) and [autoresearch](https://github.com/karpathy/autoresearch).
+
+### Where this applies
+
+- **Game bots** — evolve strategies for board games, card games, or real-time competitions through self-play
+- **Prompt engineering** — two prompt versions produce outputs, an LLM judge picks the winner
+- **Trading strategies** — backtest candidates on the same historical data, compare risk-adjusted returns
+- **Red team / blue team** — co-evolve attacks and defenses, both sides get stronger
+- **Negotiation agents** — two agents negotiate a deal, measured by outcomes
+
+Anything where you can compare two versions and say which one won.
 
 ## Example: 76 versions evolved through self-play
 
