@@ -1,22 +1,84 @@
 # autoevolve
 
-Let a coding agent evolve your strategy overnight.
+Let an AI coding agent improve strategies through automated self-play.
 
-You have a bot, a prompt, or a strategy. You can pit two versions against each other and see which one wins. But manually tweaking, benchmarking, and tracking dozens of versions is tedious. What if an AI agent did that loop for you — creating variants, running matches, keeping the winners, and repeating while you sleep?
+- Mutate strategies with a coding agent
+- Evaluate candidates head-to-head
+- Keep the strongest versions and track progress over time
 
-That's autoevolve. Three ideas that work well together:
+## What is this?
 
-1. **Agentic coding** — LLM agents are surprisingly good at iterating on hypotheses in environments with measurable feedback ([autoresearch](https://github.com/karpathy/autoresearch)). They can read code, propose changes, and run experiments autonomously.
-2. **Self-play evaluation** — not every improvement can be measured by a unit test or a loss function. Some things — game strategies, negotiation tactics, adversarial robustness — can only be measured by playing against other versions.
-3. **Genetic-Pareto search** — [GEPA](https://github.com/gepa-ai/gepa) showed that evolutionary search with LLM reflection can be surprisingly sample-efficient on certain benchmarks (100-500 evaluations vs 5,000-25,000+ for RL on ARC-AGI). Instead of collapsing everything to a scalar reward, keep a Pareto front of non-dominated solutions and branch from the best.
+`autoevolve` is a framework for iterative strategy improvement. You start with a prompt, bot, or strategy, let an AI agent create variants, benchmark them against previous versions, and keep the strongest candidates. The repo provides the loop, ratings, and tracking infrastructure — you define the arena.
 
-The motivation is similar to RL — iterative improvement via environment feedback — but with a coding agent instead of gradient descent. Where RL needs many episodes, differentiable rewards, and produces opaque weight updates, an LLM agent can read the code, analyze *why* a version lost, and propose a targeted fix. Its world knowledge acts as a strong prior. The upside is human-readable strategies and fast iteration; the downside is cost-per-step and the usual LLM reliability caveats. How far this scales is an open question — this repo is a tool for exploring it.
+## Good fits for autoevolve
 
-You define the arena and the rules. The agent runs the evolution — mutating strategies, benchmarking them head-to-head, and promoting the winners. This repo provides the loop and the tracking infrastructure.
+- **Game bots** — evolve strategies through self-play in board games, card games, or real-time competitions
+- **Prompt optimization** — two prompt versions produce outputs, an LLM judge picks the winner
+- **Heuristic policies** — evolve readable decision trees, rule sets, or state machines instead of opaque neural network weights
+- **Trading / search strategies** — backtest candidates on the same historical data, compare risk-adjusted returns
+- **Adversarial attack/defense** — co-evolve red and blue team agents, both sides get stronger
 
-Inspired by [GEPA](https://github.com/gepa-ai/gepa) and [autoresearch](https://github.com/karpathy/autoresearch).
+In general, `autoevolve` is useful anywhere two versions can compete and you can decide which one won.
 
-### Architecture
+## Example result
+
+![Evolution Progress](example/progress.png)
+
+![Evolution Animation](example/progress.gif)
+
+Example from a real evolution run: 76 versions and 235 head-to-head matchups tracked automatically. Green points are accepted improvements, gray points are discarded candidates, and the staircase shows the running best score.
+
+This is the core promise of the repo: you define the arena, and the system tracks iterative improvement over many generations.
+
+## Quick start
+
+```bash
+git clone https://github.com/MrTsepa/autoevolve.git
+cd autoevolve
+uv sync
+```
+
+Then open a coding agent (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) in this directory and say:
+
+> Review `program.md` and help me set up an evolution experiment.
+
+- `program.md` defines what is being evolved and how it is evaluated
+- the agent proposes mutations
+- match results are recorded and rated automatically
+
+## How it works
+
+```
+Mutate → Evaluate → Rate → Branch → Repeat
+```
+
+- **Mutate** — create a new version with an AI coding agent
+- **Evaluate** — run head-to-head comparisons
+- **Rate** — update pairwise ratings and stats
+- **Branch** — choose promising parents from the Pareto front
+- **Repeat** — continue until progress slows or budget runs out
+
+Every match result is recorded in `matches.json`. Ratings are computed from scratch each time using [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) maximum likelihood — order-independent and globally optimal. The Pareto front identifies which versions are worth branching from next.
+
+## Minimal workflow
+
+1. Define the strategy and evaluation rules in `program.md`
+2. Create an initial candidate (`v1`)
+3. Generate a mutation (`v2`)
+4. Run a benchmark between `v2` and `v1`
+5. Record results with `tracker.py`
+6. Inspect the leaderboard and repeat
+
+```bash
+uv run tracker.py record v2 v1 --wins 62 --losses 38
+uv run tracker.py leaderboard
+uv run tracker.py suggest v2
+uv run tracker.py progress
+```
+
+## Architecture
+
+Under the hood, `autoevolve` separates mutation, evaluation, tracking, and rating so you can plug in your own domain-specific logic.
 
 ```
 ┌─────────────┐ pick parent  ┌─────────────┐  new version  ┌──────────┐
@@ -34,92 +96,37 @@ Inspired by [GEPA](https://github.com/gepa-ai/gepa) and [autoresearch](https://g
 └─────────────┘              └─────────────┘
 ```
 
-### Where this applies
+## Why this exists
 
-- **Game bots** — evolve strategies for board games, card games, or real-time competitions through self-play
-- **RL policies as code** — instead of learning opaque neural network weights, evolve readable heuristic policies (decision trees, rule sets, state machines) that an agent can inspect, debug, and improve
-- **Prompt engineering** — two prompt versions produce outputs, an LLM judge picks the winner
-- **Trading strategies** — backtest candidates on the same historical data, compare risk-adjusted returns
-- **Red team / blue team** — co-evolve attacks and defenses, both sides get stronger
-- **Negotiation agents** — two agents negotiate a deal, measured by outcomes
+- **Agentic coding** — LLM agents are surprisingly good at iterating on hypotheses in environments with measurable feedback ([autoresearch](https://github.com/karpathy/autoresearch)). They can read code, propose changes, and run experiments autonomously.
+- **Self-play / pairwise evaluation** — not every improvement can be measured by a unit test or a loss function. Some things — game strategies, negotiation tactics, adversarial robustness — can only be measured by playing against other versions.
+- **Evolutionary search** — [GEPA](https://github.com/gepa-ai/gepa) showed that evolutionary search with LLM reflection can be surprisingly sample-efficient on certain benchmarks (100–500 evaluations vs 5,000–25,000+ for RL on ARC-AGI). Instead of collapsing everything to a scalar reward, keep a Pareto front of non-dominated solutions and branch from the best.
 
-Anything where you can compare two versions and say which one won.
+The motivation is similar to RL — iterative improvement via environment feedback — but with a coding agent instead of gradient descent. Where RL needs many episodes, differentiable rewards, and produces opaque weight updates, an LLM agent can read the code, analyze *why* a version lost, and propose a targeted fix. The upside is human-readable strategies and fast iteration; the downside is cost-per-step and the usual LLM reliability caveats. How far this scales is an open question — this repo is a tool for exploring it.
 
-## Example: 76 versions evolved through self-play
+## Repository structure
 
-![Evolution Progress](example/progress.png)
+| File | Purpose |
+|------|---------|
+| `program.md` | Agent instructions — define your environment, strategy format, and evaluation command |
+| `evolve.py` | Core protocols and orchestration primitives (`Artifact`, `Evaluator`, `Mutator`) |
+| `ratings.py` | Bradley-Terry ratings, per-version stats, Pareto front logic |
+| `tracker.py` | CLI for recording, ranking, plotting, and suggestions |
+| `example/` | Sample evolution run with data and visualizations |
 
-![Evolution Animation](example/progress.gif)
-
-Real data from a strategy evolution experiment. 76 versions, 235 matchups, tracked and rated automatically. Green dots are kept improvements; gray dots are discarded. The staircase line tracks the running best.
-
-## Getting started
-
-```bash
-git clone https://github.com/MrTsepa/autoevolve.git
-cd autoevolve
-uv sync                        # install dependencies
-```
-
-Then open a coding agent (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) in this directory and say:
-
-> Review program.md and help me set up an evolution experiment.
-
-The agent will read `program.md`, ask you about your environment (what are you evolving? how do you evaluate?), help you fill in the blanks, and start running iterations.
-
-That's it. The agent handles the loop — mutate, benchmark, record, check leaderboard, repeat. You watch the ratings climb.
-
-### Manual setup
-
-If you prefer to set things up yourself:
-
-1. Edit `program.md` — define your environment, strategy format, and evaluation command
-2. Create your first strategy version (v1)
-3. The agent (or you) runs the loop:
-
-```bash
-uv run tracker.py record v2 v1 --wins 62 --losses 38   # log result
-uv run tracker.py leaderboard                           # check standings
-uv run tracker.py suggest v2                            # pick next opponent
-uv run tracker.py progress                              # visualize progress
-```
-
-## The loop
-
-```
-Mutate     →  create a new version of the strategy
-Evaluate   →  benchmark against previous versions
-Promote    →  update ratings, crown the new best
-Archive    →  log everything for traceability
-
-repeat until convergence (or until you wake up)
-```
-
-Every match result is recorded in `matches.json`. Ratings are computed from scratch each time using [Bradley-Terry](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) maximum likelihood — order-independent and globally optimal. The Pareto front identifies which versions are worth branching from next.
-
-## What's here
-
-```
-program.md     agent instructions — start here
-evolve.py      core loop + protocols (Artifact, Evaluator, Mutator)
-ratings.py     Bradley-Terry Elo, per-version stats, Pareto front
-tracker.py     CLI: leaderboard, record, plot, validate, suggest, animate
-example/       real evolution data with animated visualization
-```
-
-The agent only touches the strategy files. Everything else is infrastructure.
+The domain-specific strategy files are yours; this repo provides the infrastructure around them.
 
 ## Tracker commands
 
-| Command | What it does |
+| Command | Description |
 |---------|-------------|
 | `record` | Log a match result |
 | `leaderboard` | Show Elo rankings with Pareto front |
 | `pareto` | Show non-dominated versions |
 | `matrix` | Head-to-head win rate table |
 | `plot` | Generate 4-panel overview (bars, progression, heatmap, Pareto) |
-| `progress` | Generate progress.png (Elo over version #) |
-| `validate` | Prediction accuracy + bootstrap CIs |
+| `progress` | Generate Elo-over-version-number chart |
+| `validate` | Prediction accuracy + bootstrap confidence intervals |
 | `suggest` | Next opponent (information-theoretic) |
 | `animate` | Generate progress.gif from match history |
 
@@ -133,8 +140,18 @@ All commands accept `--db path/to/matches.json`.
 
 **Pareto front**: versions compared across Elo, score margin, and win rate. Non-dominated versions are the best candidates to branch from.
 
-## Prior art
+## Roadmap
 
-- [GEPA](https://github.com/gepa-ai/gepa) — Genetic-Pareto evolutionary optimization of text parameters via LLM reflection
+- Better example tasks beyond the current demo
+- Reusable mutator/evaluator templates
+- Richer experiment summaries and plots
+- Easier integrations with coding agents
+- More domains: prompts, bots, trading, negotiation
+
+## Related work
+
+- [GEPA](https://github.com/gepa-ai/gepa) — genetic-Pareto evolutionary optimization of text parameters via LLM reflection
 - [autoresearch](https://github.com/karpathy/autoresearch) — autonomous AI research via overnight LLM training experiments
 - [Bradley-Terry model](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) — pairwise comparison probability model
+
+`autoevolve` differs by focusing on code-level mutations (not just text parameters) and head-to-head evaluation (not just scalar metrics), making it suited for competitive or adversarial domains.
