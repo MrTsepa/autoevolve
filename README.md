@@ -20,15 +20,27 @@ Let an AI coding agent improve strategies through automated self-play.
 
 In general, `autoevolve` is useful anywhere two versions can compete and you can decide which one won.
 
-## Example result
+## Examples
 
-![Evolution Progress](example/progress.png)
+### Prisoner's Dilemma
 
-![Evolution Animation](example/progress.gif)
+![Evolution Progress](examples/prisoners_dilemma/progress.png)
 
-Example from a real evolution run: 76 versions and 235 head-to-head matchups tracked automatically. Green points are accepted improvements, gray points are discarded candidates, and the staircase shows the running best score.
+The [`examples/prisoners_dilemma/`](examples/prisoners_dilemma/) directory contains a complete worked example: evolving strategies for the Iterated Prisoner's Dilemma through automated self-play.
 
-This is the core promise of the repo: you define the arena, and the system tracks iterative improvement over many generations.
+Starting from a trivial seed (Always Cooperate, Elo 946), the agent evolved 20 strategies and discovered a literature-quality champion — [Gradual](https://www.jstor.org/stable/40602778) (Elo 1965) — through diagnosis-driven mutation. The top three strategies form a non-transitive cycle matching classical game theory results:
+
+```
+Gradual → beats → Pavlov → beats → Tit-for-Tat → beats → Gradual
+```
+
+See the [full writeup](examples/prisoners_dilemma/README.md) for the evolution journey, key findings, and how to extend it.
+
+### Game AI Cup
+
+![Evolution Animation](examples/game_ai_cup/progress.gif)
+
+The [`examples/game_ai_cup/`](examples/game_ai_cup/) directory contains data from a real evolution run: 76 versions and 235 head-to-head matchups tracked automatically. Green points are accepted improvements, gray points are discarded candidates, and the staircase shows the running best score.
 
 ## Quick start
 
@@ -112,7 +124,8 @@ The motivation is similar to RL — iterative improvement via environment feedba
 | `evolve.py` | Core protocols and orchestration primitives (`Artifact`, `Evaluator`, `Mutator`) |
 | `ratings.py` | Bradley-Terry ratings, per-version stats, Pareto front logic |
 | `tracker.py` | CLI for recording, ranking, plotting, and suggestions |
-| `example/` | Sample evolution run with data and visualizations |
+| `examples/prisoners_dilemma/` | [Worked example](examples/prisoners_dilemma/README.md) — Iterated Prisoner's Dilemma with 20 evolved strategies |
+| `examples/game_ai_cup/` | Sample evolution run with data and visualizations |
 
 The domain-specific strategy files are yours; this repo provides the infrastructure around them.
 
@@ -142,7 +155,7 @@ All commands accept `--db path/to/matches.json`.
 
 ## Roadmap
 
-- Better example tasks beyond the current demo
+- More example tasks (see [`examples/prisoners_dilemma/`](examples/prisoners_dilemma/) for the first)
 - Reusable mutator/evaluator templates
 - Richer experiment summaries and plots
 - Easier integrations with coding agents
