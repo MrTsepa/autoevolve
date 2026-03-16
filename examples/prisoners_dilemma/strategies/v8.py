@@ -1,31 +1,53 @@
-"""v8 — Buffered Pavlov. Standard Pavlov with a noise buffer.
+"""v8 — Gradual with TFT fallback.
 
-During cooperation streaks (5+ rounds of mutual cooperation), a single
-bad outcome is assumed to be noise and ignored. This prevents Pavlov
-from accidentally learning to exploit a cooperating partner due to noise.
+Starts with Gradual. After 5+ observed defections, checks mirroring rate.
+If ≥ 70%, classifies opponent as TFT and switches to TFT mode (mirror
+opponent's last move). This avoids both:
+- Gradual's escalation feedback loop against mirrors
+- Always-cooperate's vulnerability to noise (free DC=5 for opponent)
+
+Against non-mirrors: continues with Gradual escalation.
 """
 
 
 def strategy(my_history: list[bool], opp_history: list[bool]) -> bool:
-    if not my_history:
+    if not opp_history:
         return True
 
-    my_last = my_history[-1]
-    opp_last = opp_history[-1]
+    n = len(my_history)
 
-    # Standard Pavlov: good outcome (≥3) = stay, bad = switch
-    # Good: CC(3) or DC(5). Bad: CD(0) or DD(1).
-    good = opp_last  # equivalent: good iff opponent cooperated
+    # Check if opponent is a mirror (TFT-like)
+    mirror_hits = 0
+    mirror_checks = 0
+    for i in range(n - 1):
+        if not my_history[i]:  # I defected on round i
+            mirror_checks += 1
+            if not opp_history[i + 1]:  # opponent defected on round i+1
+                mirror_hits += 1
 
-    # Noise buffer: if we had a cooperation streak before this round,
-    # treat a single bad outcome as noise
-    if not good and len(my_history) >= 5:
-        recent_mine = my_history[-5:]
-        recent_opp = opp_history[-5:-1]  # exclude current bad round
-        if all(recent_mine) and all(recent_opp):
-            # We were in a cooperation streak — this is likely noise, forgive
-            return True
+    if mirror_checks >= 5:
+        mirror_rate = mirror_hits / mirror_checks
+        if mirror_rate >= 0.70:
+            # Detected TFT — play TFT (mirror, don't just cooperate)
+            return opp_history[-1]
 
-    if good:
-        return my_last
-    return not my_last
+    # Default: Gradual
+    defection_count = 0
+    punish_remaining = 0
+    peace_remaining = 0
+
+    for i in range(n):
+        if punish_remaining > 0:
+            punish_remaining -= 1
+            if punish_remaining == 0:
+                peace_remaining = 2
+        elif peace_remaining > 0:
+            peace_remaining -= 1
+        else:
+            if not opp_history[i]:
+                defection_count += 1
+                punish_remaining = defection_count
+
+    if punish_remaining > 0:
+        return False
+    return True

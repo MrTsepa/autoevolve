@@ -26,7 +26,8 @@ Each iteration:
 - One version per iteration. Name sequentially: v1, v2, v3, ...
 - Minimum 100 games per matchup for statistical significance
 - Match data is append-only — never delete results
-- Use `uv run tracker.py suggest vN` to pick the most informative opponent
+- **Always use `uv run tracker.py suggest vN`** to pick opponents — it uses information-theoretic scoring to find the most informative matchup. Do not manually cherry-pick opponents; this leads to sparse coverage and unreliable ratings.
+- **Benchmark each new version against at least 3 opponents** before drawing conclusions. Versions with fewer opponents are flagged with `?` on the leaderboard.
 - Branch from Pareto-front versions, not just the highest-rated
 - When stuck, analyze replays or traces to diagnose specific failure modes
 - Commit matches.json after each significant benchmark round

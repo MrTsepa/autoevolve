@@ -28,13 +28,9 @@ In general, `autoevolve` is useful anywhere two versions can compete and you can
 
 The [`examples/prisoners_dilemma/`](examples/prisoners_dilemma/) directory contains a complete worked example: evolving strategies for the Iterated Prisoner's Dilemma through automated self-play.
 
-Starting from a trivial seed (Always Cooperate, Elo 946), the agent evolved 20 strategies and discovered a literature-quality champion — [Gradual](https://www.jstor.org/stable/40602778) (Elo 1965) — through diagnosis-driven mutation. The top three strategies form a non-transitive cycle matching classical game theory results:
+Starting from a trivial seed (Always Cooperate), 9 strategies were evolved using `--trace` for diagnosis, `suggest` for opponent selection, and `--record` for auto-recording. The champion combines [Gradual](https://www.jstor.org/stable/40602778) proportional punishment with opponent classification — detecting TFT via its mirroring behavior and switching to mirror mode to neutralize it. Result: **87% overall win rate**, nearly tying TFT (46%) while crushing everything else.
 
-```
-Gradual → beats → Pavlov → beats → Tit-for-Tat → beats → Gradual
-```
-
-See the [full writeup](examples/prisoners_dilemma/README.md) for the evolution journey, key findings, and how to extend it.
+See the [full writeup](examples/prisoners_dilemma/README.md) for the evolution journey and key findings.
 
 ### Game AI Cup
 
@@ -86,6 +82,10 @@ uv run tracker.py record v2 v1 --wins 62 --losses 38
 uv run tracker.py leaderboard
 uv run tracker.py suggest v2
 uv run tracker.py progress
+
+# All commands accept --db (before or after the subcommand, or via env var)
+uv run tracker.py leaderboard --db path/to/matches.json
+export AUTOEVOLVE_DB=path/to/matches.json
 ```
 
 ## Architecture
@@ -124,7 +124,7 @@ The motivation is similar to RL — iterative improvement via environment feedba
 | `evolve.py` | Core protocols and orchestration primitives (`Artifact`, `Evaluator`, `Mutator`) |
 | `ratings.py` | Bradley-Terry ratings, per-version stats, Pareto front logic |
 | `tracker.py` | CLI for recording, ranking, plotting, and suggestions |
-| `examples/prisoners_dilemma/` | [Worked example](examples/prisoners_dilemma/README.md) — Iterated Prisoner's Dilemma with 20 evolved strategies |
+| `examples/prisoners_dilemma/` | [Worked example](examples/prisoners_dilemma/README.md) — Iterated Prisoner's Dilemma with 9 evolved strategies |
 | `examples/game_ai_cup/` | Sample evolution run with data and visualizations |
 
 The domain-specific strategy files are yours; this repo provides the infrastructure around them.
@@ -134,7 +134,7 @@ The domain-specific strategy files are yours; this repo provides the infrastruct
 | Command | Description |
 |---------|-------------|
 | `record` | Log a match result |
-| `leaderboard` | Show Elo rankings with Pareto front |
+| `leaderboard` | Show Elo rankings with Pareto front and opponent coverage |
 | `pareto` | Show non-dominated versions |
 | `matrix` | Head-to-head win rate table |
 | `plot` | Generate 4-panel overview (bars, progression, heatmap, Pareto) |

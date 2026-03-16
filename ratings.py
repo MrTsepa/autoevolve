@@ -72,8 +72,8 @@ def compute_ratings(db: dict, initial: float = 1500) -> tuple[dict, dict]:
 
 
 def compute_stats(db: dict) -> dict:
-    """Per-version aggregates: win rate, score margin, total games."""
-    stats = defaultdict(lambda: {"wins": 0, "losses": 0, "scores": [], "opp_scores": []})
+    """Per-version aggregates: win rate, score margin, total games, unique opponents."""
+    stats = defaultdict(lambda: {"wins": 0, "losses": 0, "scores": [], "opp_scores": [], "opponents": set()})
 
     for m in db["matches"]:
         a, b = m["a"], m["b"]
@@ -81,6 +81,8 @@ def compute_stats(db: dict) -> dict:
         stats[a]["losses"] += m["wins_b"]
         stats[b]["wins"] += m["wins_b"]
         stats[b]["losses"] += m["wins_a"]
+        stats[a]["opponents"].add(b)
+        stats[b]["opponents"].add(a)
 
         if "mean_a" in m and "mean_b" in m:
             n = m["wins_a"] + m["wins_b"]
@@ -99,7 +101,7 @@ def compute_stats(db: dict) -> dict:
                 sum(s["scores"]) / len(s["scores"])
                 - sum(s["opp_scores"]) / len(s["opp_scores"])
             )
-        result[v] = {"win_rate": wr, "games": total, "margin": margin}
+        result[v] = {"win_rate": wr, "games": total, "margin": margin, "opponents": len(s["opponents"])}
     return result
 
 

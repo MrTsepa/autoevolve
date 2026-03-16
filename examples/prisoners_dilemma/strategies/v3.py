@@ -1,12 +1,12 @@
-"""v3 — Generous Tit-for-Tat. Like TFT but forgives defections ~10% of the time."""
-
-import random
+"""v3 — Pavlov (Win-Stay, Lose-Shift). Repeat last move if it scored ≥3, otherwise switch."""
 
 
 def strategy(my_history: list[bool], opp_history: list[bool]) -> bool:
-    if not opp_history:
+    if not my_history:
         return True
-    if opp_history[-1]:
-        return True
-    # Opponent defected — forgive with 10% probability
-    return random.random() < 0.10
+    # Good outcome: opponent cooperated (CC=3, DC=5)
+    # Bad outcome: opponent defected (CD=0, DD=1)
+    good = opp_history[-1]
+    if good:
+        return my_history[-1]  # stay
+    return not my_history[-1]  # shift

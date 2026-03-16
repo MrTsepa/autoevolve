@@ -37,26 +37,30 @@ Each iteration:
 
 1. **Check standings**:
    ```
-   uv run tracker.py --db examples/prisoners_dilemma/matches.json leaderboard
+   uv run tracker.py leaderboard --db examples/prisoners_dilemma/matches.json
    ```
 
-2. **Pick opponent**:
+2. **Pick opponent** — always use `suggest`, don't cherry-pick:
    ```
-   uv run tracker.py --db examples/prisoners_dilemma/matches.json suggest vCurrent
+   uv run tracker.py suggest vCurrent --db examples/prisoners_dilemma/matches.json
    ```
 
-3. **Analyze**: Read the losing strategy and the opponent. Why did it lose? Look at the payoff structure and think about what patterns the opponent exploits.
+3. **Analyze**: Read the losing strategy and the opponent. Use `--trace` to see move-by-move replays:
+   ```
+   uv run examples/prisoners_dilemma/arena.py vNew vOld --trace --seed 42
+   ```
 
 4. **Create new strategy**: Write `examples/prisoners_dilemma/strategies/vN.py`. Name sequentially: v1, v2, v3, ...
 
-5. **Benchmark**:
+5. **Benchmark and record** in one step with `--record`:
    ```
-   uv run examples/prisoners_dilemma/arena.py vNew vOld --games 100
+   uv run examples/prisoners_dilemma/arena.py vNew vOld --games 100 --record
    ```
+   Or without `--record`, copy the printed `tracker.py record` command.
 
-6. **Record**: Copy the printed `tracker.py record` command to log results.
+6. **Test against at least 3 opponents** before drawing conclusions. Versions with fewer opponents are flagged with `?` on the leaderboard. Use `suggest` each time to pick the most informative matchup.
 
-7. **Repeat**: Benchmark against multiple opponents to triangulate strength.
+7. **Repeat**.
 
 ## Classical strategies (reference)
 

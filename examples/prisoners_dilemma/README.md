@@ -1,6 +1,6 @@
 # Prisoner's Dilemma — Worked Example
 
-Evolving strategies for the [Iterated Prisoner's Dilemma](https://en.wikipedia.org/wiki/Prisoner%27s_dilemma#The_iterated_prisoner's_dilemma) using autoevolve. This example demonstrates the full workflow: seed a naive strategy, let an LLM agent mutate and benchmark, track progress with Elo ratings, and discover emergent game-theoretic dynamics.
+Evolving strategies for the [Iterated Prisoner's Dilemma](https://en.wikipedia.org/wiki/Prisoner%27s_dilemma#The_iterated_prisoner's_dilemma) using autoevolve. Starting from a trivial seed (Always Cooperate), the agent evolved 9 strategies and discovered a champion that combines proportional punishment with opponent classification — nearly tying the classic Tit-for-Tat while dominating everything else.
 
 ![Evolution Progress](progress.png)
 
@@ -13,176 +13,104 @@ Each round, two players simultaneously **cooperate** or **defect**:
 | **Cooperate** | 3, 3  | 0, 5   |
 | **Defect**    | 5, 0  | 1, 1   |
 
-Mutual cooperation beats mutual defection (3 > 1), but defecting against a cooperator is tempting (5 > 3). Each game lasts 200 rounds. A 5% noise rate randomly flips moves, forcing strategies to be robust to accidental defections.
+200 rounds per game, 100 games per match, 5% noise rate.
 
 ## How to run
 
 ```bash
-# Run a match (100 games × 200 rounds)
-uv run examples/prisoners_dilemma/arena.py v11 v2 --games 100
+# Run a match and auto-record
+uv run examples/prisoners_dilemma/arena.py v9 v2 --games 100 --record
 
-# Check the leaderboard
-uv run tracker.py --db examples/prisoners_dilemma/matches.json leaderboard
+# Diagnose with move-by-move trace
+uv run examples/prisoners_dilemma/arena.py v9 v2 --trace --seed 42
 
-# Get a suggested opponent
-uv run tracker.py --db examples/prisoners_dilemma/matches.json suggest v11
+# Check standings
+uv run tracker.py leaderboard --db examples/prisoners_dilemma/matches.json
 
-# Visualize progress
-uv run tracker.py --db examples/prisoners_dilemma/matches.json progress
+# Get suggested next opponent
+uv run tracker.py suggest v9 --db examples/prisoners_dilemma/matches.json
 ```
 
-## Strategy interface
-
-Each strategy is a Python file in `strategies/vN.py`:
-
-```python
-def strategy(my_history: list[bool], opp_history: list[bool]) -> bool:
-    """Return True to cooperate, False to defect."""
-```
-
-## The evolution
-
-Starting from a deliberately naive seed, the agent evolved 20 strategies across ~60 head-to-head matchups. Five versions mark the key breakthroughs:
+## Evolution journey
 
 ### v1 — Always Cooperate (seed)
 
-```python
-def strategy(my_history, opp_history):
-    return True
-```
-
-The simplest possible strategy. Cooperates unconditionally, scoring 3.0/round in mutual cooperation — but gets exploited by anything that defects. Elo: **946** (last place).
+Cooperates unconditionally. Gets exploited by everything. Elo: **-177**.
 
 ### v2 — Tit-for-Tat
 
-```python
-def strategy(my_history, opp_history):
-    if not opp_history:
-        return True
-    return opp_history[-1]
-```
+Mirror opponent's last move. The classic baseline. Elo: **2099** (#3).
 
-The classic: cooperate first, then mirror the opponent's last move. Retaliatory enough to punish defectors, cooperative enough to sustain mutual cooperation. Dominates the early field. Elo: **1964** (#2).
+### v3 — Pavlov
 
-### v4 — Pavlov (Win-Stay, Lose-Shift)
+Win-stay, lose-shift. Edges TFT (60-40) via DD-escape but gets crushed by Gradual. Elo: **1591** (#6).
 
-```python
-def strategy(my_history, opp_history):
-    if not my_history:
-        return True
-    good = opp_history[-1]  # CC=3 or DC=5 are "good"
-    if good:
-        return my_history[-1]  # stay
-    return not my_history[-1]  # shift
-```
+### v4 — Gradual
 
-The first big insight: Pavlov can escape mutual-defection spirals that TFT cannot. When both defect (DD=1), Pavlov switches to cooperation, breaking the deadlock. TFT just keeps mirroring defection forever. This gives Pavlov a structural edge over TFT (57% win rate head-to-head). Elo: **1557** (#8 — held back by later strategies).
+Proportional punishment (Beaufils 1996). Crushes Pavlov 100-0 but loses to TFT 9-91. Using `--trace` revealed the exact mechanism: each noise event adds to the defection counter permanently, causing late-game punishments of 5+ rounds. TFT mirrors these, creating extended mutual defection. Elo: **1884** (#4).
 
-### v9 — Soft Pavlov
+### v5 — Gradual with decaying counter (failed)
 
-```python
-def strategy(my_history, opp_history):
-    if not my_history:
-        return True
-    good = opp_history[-1]
-    if good:
-        return my_history[-1]
-    if random.random() < 0.15:
-        return my_history[-1]  # forgive 15%
-    return not my_history[-1]
-```
+Attempted fix: decay the counter after each cycle. Made punishment too weak — loses to everything. Elo: **621** (#7).
 
-The first strategy to beat Pavlov (58-37). Adds 15% stochastic forgiveness on bad outcomes — just enough to dampen noise-driven oscillation without becoming exploitable. Still loses to TFT, but proves Pavlov is beatable. Elo: **1479** (#9).
+### v6 — Probe + Classify (failed)
 
-### v11 — Gradual (champion)
+Probed on rounds 5-6 to detect TFT. Classification worked but noise corrupted the probe ~19% of the time. Misclassified games used Gradual vs TFT and lost badly. Elo: **1672** (#5).
 
-```python
-def strategy(my_history, opp_history):
-    if not opp_history:
-        return True
-    # Replay to reconstruct state: defection_count, punish, peace
-    for i in range(len(opp_history)):
-        if punish_remaining > 0: ...
-        elif peace_remaining > 0: ...
-        else:  # FREE — detect defections
-            if not opp_history[i]:
-                defection_count += 1
-                punish_remaining = defection_count
-    return punish_remaining <= 0
-```
+### v7 — Gradual with auto-classification (not kept)
 
-Based on [Beaufils et al. (1996)](https://www.jstor.org/stable/40602778). Proportional punishment: the Nth defection triggers N rounds of retaliation, followed by 2 cooperation rounds as a peace signal. Early defections (likely noise) get light punishment; persistent defectors face escalating consequences. Crushes Pavlov 99-0 and dominates the field. Elo: **1965** (#1).
+Used Gradual's own punishment phases as natural probes. Classified correctly but switched to always-cooperate, which still loses to TFT (free DC=5 on every noise event).
 
-## The rock-paper-scissors at the top
+### v8 — Gradual with TFT fallback
 
-The most interesting finding: the top three strategies form a non-transitive cycle.
+Key fix from v7: after detecting a mirror, switch to **TFT mode** (not always-cooperate). This cancels noise symmetrically. Reduced TFT loss from 9-87 to 25-52. Elo: **2114** (#2).
+
+### v9 — Faster classification (champion)
+
+Lowered detection threshold from 5 to 3 observations, mirroring threshold from 70% to 60%. Classifies TFT after ~2 punishment cycles instead of ~4, reducing early-game damage. Nearly ties TFT at **40-47**. Elo: **2196** (#1).
+
+## Key insight: diagnosis via `--trace`
+
+Gradual (v4) crushes Pavlov but loses to TFT. Why? The `--trace` tool showed the problem in 30 seconds:
 
 ```
-Gradual (v11) → beats → Pavlov (v4) → beats → TFT (v2) → beats → Gradual (v11)
-     99-0                    57-43                  85-14
+ Rnd      v4      v2    Pay       Total  Note
+  10       C       D  0,5     19-34    v2 noise    ← noise triggers punishment
+  11       D       C  5,0     24-34                 ← punishment round 1
+  12       D       D  1,1     25-35                 ← TFT mirrors punishment
+  13       D       D  1,1     26-36                 ← escalating...
+  14       C       D  0,5     26-41                 ← peace phase, TFT still defecting
 ```
 
-- **Gradual beats Pavlov** because escalating punishment stops Pavlov's exploitation attempts cold.
-- **Pavlov beats TFT** because Pavlov can escape DD spirals (switches to C after DD) while TFT mirrors forever.
-- **TFT beats Gradual** because Gradual's punishment creates a feedback loop — noise during punishment phases generates more "defections" that Gradual detects, triggering escalation.
-
-No single strategy dominates all three. This mirrors a well-known result in evolutionary game theory: in noisy environments, the strategy space has no global optimum — only a shifting Pareto front.
+Seeing "round 14: peace phase but TFT still defecting" made the solution obvious: detect the mirror, stop punishing it. Three iterations later, v9 nearly ties TFT while dominating everything else.
 
 ## Final leaderboard
 
 ```
-    Version         Elo    WR%   Margin  Games  Pareto
-————————————————————————————————————————————————————
-  1 v11            1965  85.8%    +0.4   1080 *
-  2 v2             1964  88.9%    +0.1   1519 *
-  3 v19            1803  64.8%    +0.2    492
-  4 v13            1761  55.8%    +0.1    378
-  5 v16            1701  56.5%    +0.1    483
-  6 v20            1643  47.1%    +0.0    393
-  7 v8             1562  53.9%    +0.6    284 *
-  8 v4             1557  56.0%    +0.1   1551
-  9 v9             1479  33.6%    +0.2    672
- 10 v14            1476  38.1%    -0.1    488
- 11 v6             1398  42.4%    -0.0    283
- 12 v12            1375  31.6%    -0.0    393
- 13 v3             1321  38.1%    -0.0    294
- 14 v15            1281  27.6%    -0.1    392
- 15 v7             1233  31.8%    -0.1    292
- 16 v5             1036  21.1%    -0.2    289
- 17 v1              946   6.7%    -0.7   1563
+    Version         Elo    WR%   Margin  Games   Opp
+——————————————————————————————————————————————————————————
+  1 v9             2196  87.3%    +0.4    659    7 *
+  2 v8             2114  81.7%    +0.4    651    7
+  3 v2             2099  80.0%    +0.1    646    7
+  4 v4             1884  60.6%    +0.3    680    7
+  5 v6             1672  34.6%    -0.0    584    6
+  6 v3             1591  38.7%    +0.2    688    7
+  7 v5              621  16.5%    -0.5    600    6
+  8 v1             -177   0.1%    -0.8    700    7
 ```
 
-20 versions evolved. 5 reached the Pareto front. 15 were discarded — a realistic mutation/selection ratio.
+## Head-to-head matrix
 
-## What this demonstrates
+```
+              v1      v2      v3      v4      v5      v6      v8      v9
+      v1       —      0%      0%      0%      1%      0%      0%      0%
+      v2    100%       —     40%     91%    100%     98%     68%     54%
+      v3    100%     60%       —      0%    100%     12%      1%      0%
+      v4    100%      9%    100%       —    100%     96%      9%      5%
+      v5     99%      0%      0%      0%       —              0%      0%
+      v6    100%      2%     88%      4%               —      5%      3%
+      v8    100%     32%     99%     91%    100%     95%       —     35%
+      v9    100%     46%    100%     95%    100%     97%     65%       —
+```
 
-1. **The autoevolve workflow works.** From a trivial seed (Always Cooperate, Elo 946) to a literature-quality champion (Gradual, Elo 1965) through targeted mutation and selection.
-
-2. **Diagnosis-driven mutation beats random search.** The agent read losing matchups, identified *why* strategies failed (noise spirals, exploitation, escalation feedback), and proposed targeted fixes. This is the key advantage over blind evolutionary search.
-
-3. **Most mutations fail — and that's fine.** 15 of 20 versions were discarded. The tracker's Elo ratings and Pareto front make it cheap to identify winners and prune losers.
-
-4. **Non-trivial dynamics emerge.** The rock-paper-scissors cycle at the top wasn't designed — it was discovered through the evolution process, matching decades of game theory research.
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `arena.py` | Head-to-head evaluation harness |
-| `program.md` | Agent instructions for the evolution loop |
-| `matches.json` | Full match history (append-only) |
-| `progress.png` | Evolution progress visualization |
-| `strategies/v1.py` | Seed strategy (Always Cooperate) |
-| `strategies/v2.py–v20.py` | Evolved strategies |
-
-## Extending this example
-
-To continue evolving from here:
-
-1. Read `program.md` for the full agent workflow
-2. Check the leaderboard and pick a parent from the Pareto front
-3. Analyze its weaknesses against top opponents
-4. Write a new `strategies/v21.py` targeting those weaknesses
-5. Benchmark against 2–3 opponents and record results
-
-The TFT–Gradual matchup remains unsolved — can you evolve a strategy that beats both?
+Dense coverage thanks to `suggest` — every version tested against 6-7 opponents.

@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import math
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -39,7 +40,7 @@ def _dims(ratings, stats):
     }
 
 
-def show_leaderboard(db):
+def show_leaderboard(db, min_opponents=3):
     ratings, _ = compute_ratings(db)
     stats = compute_stats(db)
     if not ratings:
@@ -49,14 +50,19 @@ def show_leaderboard(db):
     sorted_v = sorted(ratings, key=ratings.get, reverse=True)
     front = pareto_front(sorted_v, _dims(ratings, stats))
 
-    print(f"\n{'':>3} {'Version':<12} {'Elo':>6} {'WR%':>6} {'Margin':>8} {'Games':>6} {'Pareto':>7}")
-    print("\u2014" * 52)
+    print(f"\n{'':>3} {'Version':<12} {'Elo':>6} {'WR%':>6} {'Margin':>8} {'Games':>6} {'Opp':>5} {'':>7}")
+    print("\u2014" * 58)
     for i, v in enumerate(sorted_v):
-        s = stats.get(v, {"win_rate": 50, "margin": 0, "games": 0})
-        p = " *" if v in front else ""
+        s = stats.get(v, {"win_rate": 50, "margin": 0, "games": 0, "opponents": 0})
+        opp = s.get("opponents", 0)
+        flags = ""
+        if v in front and opp >= min_opponents:
+            flags = " *"
+        elif opp < min_opponents:
+            flags = " ?"
         print(
             f"{i+1:>3} {v:<12} {ratings[v]:>6.0f} {s['win_rate']:>5.1f}% "
-            f"{s['margin']:>+7.1f} {s['games']:>6}{p}"
+            f"{s['margin']:>+7.1f} {s['games']:>6} {opp:>4}{flags}"
         )
 
 
@@ -642,11 +648,18 @@ def cmd_animate(args):
 
 
 def main():
+    db_default = os.environ.get("AUTOEVOLVE_DB", "matches.json")
+
     parser = argparse.ArgumentParser(description="autoevolve tracker")
-    parser.add_argument("--db", default="matches.json", help="Path to matches.json")
+    parser.add_argument("--db", default=db_default, help="Path to matches.json (env: AUTOEVOLVE_DB)")
     sub = parser.add_subparsers(dest="cmd")
 
+    def _add_db(p):
+        """Add --db to a subcommand so it works in both positions."""
+        p.add_argument("--db", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+
     p = sub.add_parser("record", help="Record a match result")
+    _add_db(p)
     p.add_argument("version_a")
     p.add_argument("version_b")
     p.add_argument("--wins", type=int, required=True)
@@ -655,17 +668,15 @@ def main():
     p.add_argument("--mean-b", type=float, default=None)
     p.add_argument("--note", default=None)
 
-    sub.add_parser("leaderboard", help="Show Elo leaderboard")
-    sub.add_parser("pareto", help="Show Pareto front")
-    sub.add_parser("matrix", help="Show head-to-head matrix")
-    sub.add_parser("plot", help="Generate progress.png (4-panel)")
-    sub.add_parser("progress", help="Generate progress.png (Elo over version #)")
-    sub.add_parser("validate", help="Assess rating reliability")
+    for name in ["leaderboard", "pareto", "matrix", "plot", "progress", "validate"]:
+        _add_db(sub.add_parser(name))
 
     p = sub.add_parser("suggest", help="Suggest next opponent")
+    _add_db(p)
     p.add_argument("version")
 
     p = sub.add_parser("animate", help="Generate progress.gif")
+    _add_db(p)
     p.add_argument("--step", type=int, default=1, help="Matches per frame (default: every match)")
     p.add_argument("--dpi", type=int, default=72, help="Resolution (default: 72)")
 
