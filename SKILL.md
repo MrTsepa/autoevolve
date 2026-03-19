@@ -1,3 +1,8 @@
+---
+name: autoevolve
+description: Iteratively improve code, strategies, or prompts through mutation, evaluation, and selection
+---
+
 # AutoEvolve
 
 Iteratively improve code, strategies, or prompts through mutation, evaluation, and selection.
