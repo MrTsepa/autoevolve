@@ -153,6 +153,75 @@ All commands accept `--db path/to/matches.json`.
 
 **Pareto front**: versions compared across Elo, score margin, and win rate. Non-dominated versions are the best candidates to branch from.
 
+## Use as a Claude Code skill
+
+AutoEvolve is available as a [Claude Code custom skill](https://docs.anthropic.com/en/docs/claude-code/skills). Once installed, Claude Code gains the ability to run evolution experiments autonomously.
+
+### Install from GitHub
+
+Add to your project's `.claude/settings.json`:
+
+```json
+{
+  "skills": ["https://github.com/MrTsepa/autoevolve"]
+}
+```
+
+Or install via the CLI:
+
+```bash
+claude skill add https://github.com/MrTsepa/autoevolve
+```
+
+### Install from skills.sh
+
+```bash
+claude skill add autoevolve
+```
+
+### What the skill provides
+
+Once installed, you can ask Claude Code:
+
+> Set up an autoevolve experiment to optimize my game bot.
+
+> Help me evolve a better prompt for my summarization task.
+
+> Run the next iteration of my evolution experiment.
+
+Claude Code will read `SKILL.md`, understand the mutation/evaluation/selection loop, and drive the experiment using the tracker CLI.
+
+See [`SKILL.md`](SKILL.md) for the full skill specification.
+
+## Publishing
+
+To publish this skill:
+
+1. Ensure the repo is public on GitHub
+2. Verify `SKILL.md` is at the repo root
+3. Test the skill by adding it to a project: `claude skill add https://github.com/MrTsepa/autoevolve`
+4. Optionally register at [skills.sh](https://skills.sh) for short-name installs
+
+## Demo scenario
+
+Here is a self-contained demo you can run in under 10 minutes:
+
+```bash
+# 1. Clone and set up
+git clone https://github.com/MrTsepa/autoevolve.git
+cd autoevolve
+uv sync
+
+# 2. Open Claude Code in the prisoners_dilemma example
+cd examples/prisoners_dilemma
+claude
+
+# 3. Ask Claude Code to run an evolution iteration:
+#    "Read program.md, check the leaderboard, and evolve the next strategy version."
+```
+
+Claude will check standings, analyze the current champion, propose a mutation, benchmark it, and record the results — all autonomously.
+
 ## Roadmap
 
 - More example tasks (see [`examples/prisoners_dilemma/`](examples/prisoners_dilemma/) for the first)
