@@ -6,6 +6,36 @@ Let an AI coding agent improve strategies through automated self-play.
 - Evaluate candidates head-to-head
 - Keep the strongest versions and track progress over time
 
+## Quick start with Claude Code
+
+AutoEvolve works as a [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code/skills). Install it and Claude Code learns how to run evolution experiments autonomously.
+
+```bash
+claude skill add https://github.com/MrTsepa/autoevolve
+```
+
+Then ask Claude Code:
+
+> Set up an autoevolve experiment to optimize my game bot.
+
+> Help me evolve a better prompt for my summarization task.
+
+> Run the next iteration of my evolution experiment.
+
+See [`SKILL.md`](SKILL.md) for the full skill specification.
+
+### Alternative: clone the repo directly
+
+```bash
+git clone https://github.com/MrTsepa/autoevolve.git
+cd autoevolve
+uv sync
+```
+
+Then open Claude Code in this directory and say:
+
+> Review `program.md` and help me set up an evolution experiment.
+
 ## What is this?
 
 `autoevolve` is a framework for iterative strategy improvement. You start with a prompt, bot, or strategy, let an AI agent create variants, benchmark them against previous versions, and keep the strongest candidates. The repo provides the loop, ratings, and tracking infrastructure — you define the arena.
@@ -37,22 +67,6 @@ See the [full writeup](examples/prisoners_dilemma/README.md) for the evolution j
 ![Evolution Animation](examples/game_ai_cup/progress.gif)
 
 The [`examples/game_ai_cup/`](examples/game_ai_cup/) directory contains data from a real evolution run: 76 versions and 235 head-to-head matchups tracked automatically. Green points are accepted improvements, gray points are discarded candidates, and the staircase shows the running best score.
-
-## Quick start
-
-```bash
-git clone https://github.com/MrTsepa/autoevolve.git
-cd autoevolve
-uv sync
-```
-
-Then open a coding agent (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)) in this directory and say:
-
-> Review `program.md` and help me set up an evolution experiment.
-
-- `program.md` defines what is being evolved and how it is evaluated
-- the agent proposes mutations
-- match results are recorded and rated automatically
 
 ## How it works
 
@@ -152,6 +166,29 @@ All commands accept `--db path/to/matches.json`.
 **Information-theoretic matchmaking**: `score = p*(1-p) / sqrt(games+1)` — prioritizes matchups that are both close (uncertain outcome) and undersampled.
 
 **Pareto front**: versions compared across Elo, score margin, and win rate. Non-dominated versions are the best candidates to branch from.
+
+## Demo scenario
+
+Try the Prisoner's Dilemma example in under 10 minutes:
+
+```bash
+git clone https://github.com/MrTsepa/autoevolve.git
+cd autoevolve/examples/prisoners_dilemma
+uv sync
+claude
+# Ask: "Read program.md, check the leaderboard, and evolve the next strategy version."
+```
+
+Claude will check standings, analyze the current champion, propose a mutation, benchmark it, and record results autonomously.
+
+## Publishing
+
+To publish this skill:
+
+1. Ensure the repo is public on GitHub
+2. Verify `SKILL.md` is at the repo root
+3. Test: `claude skill add https://github.com/MrTsepa/autoevolve`
+4. Optionally register at [skills.sh](https://skills.sh) for short-name installs
 
 ## Roadmap
 
