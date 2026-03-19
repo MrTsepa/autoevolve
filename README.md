@@ -11,7 +11,7 @@ Let an AI coding agent improve strategies through automated self-play.
 AutoEvolve works as a [Claude Code skill](https://docs.anthropic.com/en/docs/claude-code/skills). Install it and Claude Code learns how to run evolution experiments autonomously.
 
 ```bash
-claude skill add https://github.com/MrTsepa/autoevolve
+claude skill add https://github.com/MrTsepa/autoevolve@v0.1.0
 ```
 
 Then ask Claude Code:
@@ -187,8 +187,7 @@ To publish this skill:
 
 1. Ensure the repo is public on GitHub
 2. Verify `SKILL.md` is at the repo root
-3. Test: `claude skill add https://github.com/MrTsepa/autoevolve`
-4. Optionally register at [skills.sh](https://skills.sh) for short-name installs
+3. Test: `claude skill add https://github.com/MrTsepa/autoevolve@v0.1.0`
 
 ## Roadmap
 
