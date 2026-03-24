@@ -1,10 +1,20 @@
+<div align="center">
+
 # autoevolve
 
-Let an AI coding agent improve strategies through automated self-play.
+**[autoresearch](https://github.com/karpathy/autoresearch), but for self-play.** Instead of optimizing a scalar metric overnight, evolve strategies by competing against previous versions head-to-head.
+
+[![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-blue?logo=anthropic&logoColor=white)](https://docs.anthropic.com/en/docs/claude-code/skills)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Based on](https://img.shields.io/badge/Based_on-Karpathy's_Autoresearch-orange)](https://github.com/karpathy/autoresearch)
+[![Follow @CepaStas18593](https://img.shields.io/badge/Follow-@CepaStas18593-000000?style=flat&logo=x&logoColor=white)](https://x.com/CepaStas18593)
+
+</div>
 
 - Mutate strategies with a coding agent
 - Evaluate candidates head-to-head
 - Keep the strongest versions and track progress over time
+- Used in [Game AI Cup](https://gameaicup.com) to place [**6th out of 83 participants**](https://gameaicup.com/leaderboard?round=final%20round) — all code written by Claude Code
 
 ## Quick start with Claude Code
 
@@ -72,7 +82,7 @@ See the [full writeup](examples/prisoners_dilemma/README.md) for the evolution j
 
 ![Evolution Animation](examples/game_ai_cup/progress.gif)
 
-The [`examples/game_ai_cup/`](examples/game_ai_cup/) directory contains data from a real evolution run: 76 versions and 235 head-to-head matchups tracked automatically. Green points are accepted improvements, gray points are discarded candidates, and the staircase shows the running best score.
+The [`examples/game_ai_cup/`](examples/game_ai_cup/) directory contains data from a real evolution run used in the [Game AI Cup](https://gameaicup.com) competition: 76 versions and 235 head-to-head matchups tracked automatically. The approach placed [6th out of 83 participants](https://gameaicup.com/leaderboard?round=final%20round). Green points are accepted improvements, gray points are discarded candidates, and the staircase shows the running best score.
 
 ## How it works
 
@@ -205,8 +215,9 @@ To publish this skill:
 
 ## Related work
 
-- [GEPA](https://github.com/gepa-ai/gepa) — genetic-Pareto evolutionary optimization of text parameters via LLM reflection
 - [autoresearch](https://github.com/karpathy/autoresearch) — autonomous AI research via overnight LLM training experiments
+- [awesome-autoresearch](https://github.com/WecoAI/awesome-autoresearch) — curated list of autoresearch use cases, implementations, and forks
+- [GEPA](https://github.com/gepa-ai/gepa) — genetic-Pareto evolutionary optimization of text parameters via LLM reflection
 - [Bradley-Terry model](https://en.wikipedia.org/wiki/Bradley%E2%80%93Terry_model) — pairwise comparison probability model
 
 `autoevolve` differs by focusing on code-level mutations (not just text parameters) and head-to-head evaluation (not just scalar metrics), making it suited for competitive or adversarial domains.
