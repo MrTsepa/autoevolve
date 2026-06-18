@@ -210,7 +210,7 @@ def main():
 
     result = run_match(fn_a, fn_b, args.games, args.rounds, args.seed)
 
-    print(f"Results:")
+    print("Results:")
     print(f"  {args.player_a}: {result['wins_a']} wins, mean {result['mean_a']:.4f}/round")
     print(f"  {args.player_b}: {result['wins_b']} wins, mean {result['mean_b']:.4f}/round")
     print(f"  Draws: {result['draws']}")
@@ -219,7 +219,7 @@ def main():
     if args.record:
         record_result(args.db, args.player_a, args.player_b, result)
     else:
-        print(f"Record result:")
+        print("Record result:")
         print(
             f"  uv run tracker.py record {args.player_a} {args.player_b}"
             f" --wins {result['wins_a']} --losses {result['wins_b']}"

@@ -105,7 +105,7 @@ def compute_stats(db: dict) -> dict:
     return result
 
 
-def pareto_front(versions: list, dimensions: dict) -> set:
+def pareto_front(dimensions: dict) -> set:
     """Find Pareto-optimal versions across multiple dimensions.
 
     dimensions: {version: [dim1_val, dim2_val, ...]}

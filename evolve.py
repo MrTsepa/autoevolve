@@ -1,13 +1,13 @@
 """
-autoevolve — evolution loop for automated iterative improvement.
+autoevolve — data layer and evaluation contract for self-play improvement.
 
-Mutate -> Evaluate -> Promote -> Archive
+The self-play *loop* lives in the skill (see SKILL.md): a coding agent is the
+mutator and the loop driver. This file defines what the loop operates on — the
+match database and the contract an arena must satisfy to be evaluated.
 
-A coding agent creates candidate variants of an artifact (a bot, prompt, strategy,
-or model config), evaluates them through head-to-head comparison, promotes the
-winners based on Elo ratings, and archives everything for traceability.
-
-This file defines the core loop and its building blocks.
+  - ``MatchResult`` / ``load_db`` / ``save_db`` / ``record`` — the match ledger.
+  - ``Artifact`` / ``Evaluator`` — the typed expression of the arena contract:
+    something with a version, and a way to compare two of them head-to-head.
 """
 
 from __future__ import annotations
@@ -29,12 +29,15 @@ class MatchResult:
     b: str
     wins_a: int
     wins_b: int
+    draws: int = 0
     mean_a: float | None = None
     mean_b: float | None = None
     note: str | None = None
 
     def to_dict(self) -> dict:
         d = {"a": self.a, "b": self.b, "wins_a": self.wins_a, "wins_b": self.wins_b}
+        if self.draws:
+            d["draws"] = self.draws
         if self.mean_a is not None:
             d["mean_a"] = self.mean_a
         if self.mean_b is not None:
@@ -57,16 +60,17 @@ class Artifact(Protocol):
 
 @runtime_checkable
 class Evaluator(Protocol):
-    """Compares two artifacts. Returns a MatchResult."""
+    """Compares two artifacts head-to-head and returns a MatchResult.
+
+    This is the typed expression of the arena contract. In practice an arena
+    conforms by exposing a command that prints the contract JSON:
+
+        <eval-cmd> --a vN --b vM -n 100
+        -> {"wins_a": int, "wins_b": int, "draws": int,
+            "mean_a": float?, "mean_b": float?}
+    """
 
     def evaluate(self, a: Artifact, b: Artifact, n_games: int) -> MatchResult: ...
-
-
-@runtime_checkable
-class Mutator(Protocol):
-    """Creates a new candidate from a parent artifact."""
-
-    def mutate(self, parent: Artifact) -> Artifact: ...
 
 
 # ── Database ────────────────────────────────────────────────
@@ -88,61 +92,9 @@ def save_db(db: dict, path: str | Path = "matches.json"):
 
 
 def record(db: dict, result: MatchResult) -> dict:
-    """Append a match result to the database."""
+    """Append a match result to the database (append-only)."""
     db["matches"].append(result.to_dict())
     for v in [result.a, result.b]:
         if v not in db["versions"]:
             db["versions"][v] = {}
-    return db
-
-
-# ── Evolution loop ──────────────────────────────────────────
-
-
-def evolve(
-    seed: Artifact,
-    mutator: Mutator,
-    evaluator: Evaluator,
-    *,
-    db_path: str | Path = "matches.json",
-    n_games: int = 100,
-    n_candidates: int = 1,
-    max_generations: int = 50,
-    on_step: callable | None = None,
-) -> dict:
-    """
-    Run the Mutate-Evaluate-Promote-Archive loop.
-
-    Each generation:
-      1. Generate — mutator creates n_candidates variants from current best
-      2. Evaluate — each candidate plays n_games against current best
-      3. Promote — recompute ratings, crown new best if earned
-      4. Archive — save DB, call on_step callback
-
-    Returns the final database.
-    """
-    from ratings import compute_ratings
-
-    db = load_db(db_path)
-    best_version = seed.version
-
-    for gen in range(max_generations):
-        # GENERATE
-        candidates = [mutator.mutate(seed) for _ in range(n_candidates)]
-
-        # EVALUATE
-        for candidate in candidates:
-            result = evaluator.evaluate(candidate, seed, n_games)
-            record(db, result)
-
-        # PROMOTE
-        save_db(db, db_path)
-        ratings, _ = compute_ratings(db)
-        if ratings:
-            best_version = max(ratings, key=ratings.get)
-
-        # ARCHIVE
-        if on_step:
-            on_step(gen=gen, best=best_version, ratings=ratings, db=db)
-
     return db

@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from evolve import load_db, save_db
+from evolve import MatchResult, load_db, record, save_db
 from ratings import compute_ratings, compute_stats, pareto_front
 
 
@@ -48,7 +48,7 @@ def show_leaderboard(db, min_opponents=3):
         return
 
     sorted_v = sorted(ratings, key=ratings.get, reverse=True)
-    front = pareto_front(sorted_v, _dims(ratings, stats))
+    front = pareto_front(_dims(ratings, stats))
 
     print(f"\n{'':>3} {'Version':<12} {'Elo':>6} {'WR%':>6} {'Margin':>8} {'Games':>6} {'Opp':>5} {'':>7}")
     print("\u2014" * 58)
@@ -71,17 +71,16 @@ def show_leaderboard(db, min_opponents=3):
 
 def cmd_record(args):
     db = load_db(args.db)
-    match = {"a": args.version_a, "b": args.version_b, "wins_a": args.wins, "wins_b": args.losses}
-    if args.mean_a is not None:
-        match["mean_a"] = args.mean_a
-    if args.mean_b is not None:
-        match["mean_b"] = args.mean_b
-    if args.note:
-        match["note"] = args.note
-    db["matches"].append(match)
-    for v in [args.version_a, args.version_b]:
-        if v not in db["versions"]:
-            db["versions"][v] = {}
+    result = MatchResult(
+        a=args.version_a,
+        b=args.version_b,
+        wins_a=args.wins,
+        wins_b=args.losses,
+        mean_a=args.mean_a,
+        mean_b=args.mean_b,
+        note=args.note,
+    )
+    record(db, result)
     save_db(db, args.db)
     print(f"Recorded: {args.version_a} vs {args.version_b} = {args.wins}W-{args.losses}L")
     show_leaderboard(db)
@@ -99,7 +98,7 @@ def cmd_pareto(args):
         print("No matches recorded yet.")
         return
 
-    front = pareto_front(list(ratings.keys()), _dims(ratings, stats))
+    front = pareto_front(_dims(ratings, stats))
 
     print("Pareto front (non-dominated across Elo, margin, win rate):")
     print(f"\n{'Version':<12} {'Elo':>6} {'Margin':>8} {'WR%':>6}")
@@ -136,8 +135,8 @@ def cmd_matrix(args):
             if a == b:
                 print(f"{dash:>{col_w}}", end="")
             elif h2h[a][b][0] + h2h[a][b][1] > 0:
-                w, l = h2h[a][b]
-                wr = w / (w + l) * 100
+                w, loss = h2h[a][b]
+                wr = w / (w + loss) * 100
                 print(f"{wr:>{col_w - 1}.0f}%", end="")
             else:
                 print(f"{'':>{col_w}}", end="")
@@ -161,7 +160,7 @@ def cmd_plot(args):
 
     plot_path = Path(args.db).parent / "progress.png"
     all_v = sorted(ratings, key=ratings.get, reverse=True)
-    front = pareto_front(all_v, _dims(ratings, stats))
+    front = pareto_front(_dims(ratings, stats))
     top = all_v[:15]
 
     fig, axes = plt.subplots(2, 2, figsize=(16, 12))
@@ -213,8 +212,8 @@ def cmd_plot(args):
     for i, a in enumerate(top):
         for j, b in enumerate(top):
             if i != j and h2h[a][b][0] + h2h[a][b][1] > 0:
-                w, l = h2h[a][b]
-                matrix[i, j] = w / (w + l) * 100
+                w, loss = h2h[a][b]
+                matrix[i, j] = w / (w + loss) * 100
     im = ax.imshow(matrix, cmap="RdYlGn", vmin=20, vmax=80, aspect="auto")
     ax.set_xticks(range(n))
     ax.set_yticks(range(n))
@@ -296,12 +295,12 @@ def cmd_validate(args):
     if total:
         print(f"  Correct: {correct}/{total} ({correct / total * 100:.1f}%)")
     residuals.sort(key=lambda x: abs(x[3] - x[4]), reverse=True)
-    print(f"\n  Biggest misses:")
+    print("\n  Biggest misses:")
     for a, b, n, pred, actual in residuals[:5]:
         print(f"    {a:>6} vs {b:<6}: pred {pred:5.1f}%, actual {actual:5.1f}% ({n} games)")
 
     # Bootstrap CI
-    print(f"\n=== Bootstrap Confidence Intervals (100 resamples) ===")
+    print("\n=== Bootstrap Confidence Intervals (100 resamples) ===")
     bootstrap = defaultdict(list)
     for _ in range(100):
         resampled = [pyrandom.choice(db["matches"]) for _ in range(len(db["matches"]))]
@@ -363,7 +362,6 @@ def cmd_progress(args):
 
     db = load_db(args.db)
     ratings, _ = compute_ratings(db)
-    stats = compute_stats(db)
     if not ratings:
         print("No matches recorded yet.")
         return
@@ -377,10 +375,8 @@ def cmd_progress(args):
 
     all_v = sorted(ratings.keys(), key=sort_key)
 
-    # Determine which versions are "kept" (were ever the best at time of creation)
-    # Approximate: a version is "kept" if it's on the Pareto front or was ever #1
-    dims = _dims(ratings, stats)
-    front = pareto_front(all_v, dims)
+    # A version is "kept" if it set a new running-best Elo at its point in the
+    # sequence (computed below).
 
     # Build running best
     running_best_elo = float("-inf")
@@ -498,7 +494,7 @@ def cmd_animate(args):
     for fi, k in enumerate(frame_indices):
         ratings, stats = snapshots[k]
         sorted_v = sorted(ratings, key=ratings.get, reverse=True)[:15]
-        front = pareto_front(sorted_v, _dims(ratings, stats))
+        front = pareto_front(_dims(ratings, stats))
 
         # Per-frame bounds from current top 15
         elos = [ratings[v] for v in sorted_v]
@@ -577,8 +573,8 @@ def cmd_animate(args):
         for i, a in enumerate(sorted_v):
             for j, b in enumerate(sorted_v):
                 if i != j and h2h[a][b][0] + h2h[a][b][1] > 0:
-                    w, l = h2h[a][b]
-                    matrix[i, j] = w / (w + l) * 100
+                    w, loss = h2h[a][b]
+                    matrix[i, j] = w / (w + loss) * 100
         im = ax.imshow(matrix, cmap="RdYlGn", vmin=20, vmax=80, aspect="auto")
         ax.set_xticks(range(nv))
         ax.set_yticks(range(nv))
